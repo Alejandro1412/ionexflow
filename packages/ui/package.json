@@ -1,0 +1,14 @@
+{
+  "name": "@ionexflow/ui",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "dependencies": {
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@ionexflow/config": "workspace:*",
+    "typescript": "^5.6.3"
+  }
+}

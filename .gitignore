@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+dist/
+build/
+.expo/
+.turbo/
+
+# Env files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Supabase
+supabase/.branches
+supabase/.temp
+
+# Misc
+.DS_Store
+*.log
+npm-debug.log*
+.vercel
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.tsbuildinfo

@@ -1,0 +1,4 @@
+-- Local development seed data.
+-- Runs automatically after `supabase db reset`. Safe to extend per-phase;
+-- kept intentionally empty in Phase 1 since organizations/profiles are
+-- created through the normal signup flow (see handle_new_user() trigger).

@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 225 36% 4%;
+    --foreground: 218 100% 95%;
+    --primary: 176 100% 62%;
+    --primary-foreground: 225 36% 4%;
+    --muted: 220 49% 10%;
+    --muted-foreground: 215 25% 70%;
+    --destructive: 348 100% 68%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 40% 18%;
+    --ring: 176 100% 62%;
+    --radius: 0.75rem;
+    --glass: 220 49% 8%;
+    --signal: 176 100% 62%;
+    --arc: 222 100% 68%;
+  }
+
+  .dark {
+    --background: 225 36% 4%;
+    --foreground: 218 100% 95%;
+    --primary: 176 100% 62%;
+    --primary-foreground: 225 36% 4%;
+    --muted: 220 49% 10%;
+    --muted-foreground: 215 25% 70%;
+    --destructive: 348 100% 68%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 40% 18%;
+    --ring: 176 100% 62%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-color: #05070f;
+  }
+
+  ::selection {
+    background: hsl(var(--signal) / 0.35);
+    color: hsl(var(--foreground));
+  }
+}
+
+@layer utilities {
+  .text-display {
+    @apply font-display tracking-tight;
+  }
+
+  .glass-panel {
+    @apply rounded-xl border border-white/10 bg-[hsl(var(--glass)/0.55)] shadow-[0_0_40px_rgba(61,255,242,0.08)] backdrop-blur-xl;
+  }
+
+  .glow-text {
+    text-shadow: 0 0 24px rgba(61, 255, 242, 0.35);
+  }
+}

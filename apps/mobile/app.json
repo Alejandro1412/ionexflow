@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "IonexFlow",
+    "slug": "ionexflow",
+    "scheme": "ionexflow",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": ["expo-router"],
+    "ios": {
+      "bundleIdentifier": "com.ionexflow.app",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.ionexflow.app"
+    },
+    "extra": {
+      "router": { "origin": false }
+    }
+  }
+}
