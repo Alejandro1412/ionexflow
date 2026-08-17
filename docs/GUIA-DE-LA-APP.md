@@ -2,7 +2,7 @@
 
 Documento paso a paso: **para qué sirve**, **qué puedes hacer hoy** y **cómo funciona por dentro**.
 
-> Estado actual: **Fase 1**  
+> Estado actual: **Fases 1–5 implementadas** (auth, billing, canvas, motor, móvil)  
 > Repo: [github.com/Alejandro1412/ionexflow](https://github.com/Alejandro1412/ionexflow)
 
 ---
@@ -19,7 +19,15 @@ Documento paso a paso: **para qué sirve**, **qué puedes hacer hoy** y **cómo 
 
 En resumen: es el **command center** (centro de mando) de agentes autónomos, con control humano y listo para monetizar.
 
-Hoy (Fase 1) ya tienes la **cáscara del producto**: identidad, autenticación, multi-tenant (organizaciones), seguridad por filas (RLS) y una UI inmersiva. El canvas visual, el motor de ejecución, el cobro y la app móvil de aprobaciones llegan en fases siguientes.
+Hoy ya tienes el producto usable de punta a punta:
+
+1. Identidad + multi-tenant (org/profile/RLS)
+2. Billing (Stripe o Activate Pro en local)
+3. Canvas React Flow + CRUD de workflows
+4. Motor de ejecución con pausas de aprobación
+5. Inbox móvil Realtime
+
+El canvas, el motor y la app companion ya están cableados sobre el schema de Fase 1.
 
 ---
 

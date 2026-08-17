@@ -1,96 +1,77 @@
 # IonexFlow
 
-Monetization-ready B2B SaaS for building, orchestrating, and monitoring
-autonomous AI agent workflows visually.
+B2B SaaS for building, orchestrating, and monitoring autonomous AI agent
+workflows visually — with human-in-the-loop approvals and Stripe billing.
 
-> **Status: Phase 1** — monorepo scaffold, Supabase Auth, and the core
-> database schema (with Row Level Security). Billing, the React Flow
-> canvas, the execution engine, and the mobile approval inbox land in
-> Phases 2–5.
+> **Status: Phases 1–5 implemented** — auth, billing, React Flow canvas,
+> execution engine, and mobile Realtime approval inbox.
 
 ## Stack
 
-| Layer       | Choice                                                        |
-| ----------- | -------------------------------------------------------------- |
-| Monorepo    | Turborepo + pnpm workspaces                                    |
-| Web         | Next.js 14 (App Router), TypeScript, Tailwind CSS, shadcn-style UI |
-| Mobile      | Expo (Expo Router) + NativeWind                                |
-| Database    | Supabase (PostgreSQL, Row Level Security)                      |
-| Auth        | Supabase Auth — email/password + Google OAuth                  |
-| Billing     | Stripe (`stripe-node`) — Phase 2                                |
-| Orchestration | LangChain.js / state-machine graph runner — Phase 4           |
+| Layer | Choice |
+| --- | --- |
+| Monorepo | Turborepo + pnpm workspaces |
+| Web | Next.js 14, TypeScript, Tailwind, React Flow, Three.js |
+| Mobile | Expo Router + Supabase Auth + Realtime |
+| Database | Supabase (PostgreSQL + RLS) |
+| Billing | Stripe Checkout + webhooks (+ local Activate Pro bypass) |
+| Engine | In-process graph runner (start → agent → approval → end) |
 
 ## Repo layout
 
 ```
 apps/
-  web/        Next.js Command Center (landing, auth, dashboard)
-  mobile/     Expo companion app (Realtime approvals — Phase 5)
+  web/        Command Center (landing, auth, canvas, billing, logs)
+  mobile/     Companion app (login + Realtime approvals)
 packages/
-  config/     Shared tsconfig + eslint presets
-  ui/         Shared component library (populated in Phase 3)
-supabase/
-  migrations/ SQL migrations
-  config.toml Local Supabase CLI config
-  seed.sql    Local dev seed data
+  config/     Shared tsconfig + eslint
+  ui/         Shared UI package (placeholder)
+supabase/     Migrations, local config, seed
+docs/         Product guide + design specs
 ```
 
 ## Getting started
 
-Requires Node 20+, pnpm 9+, and the [Supabase CLI](https://supabase.com/docs/guides/cli).
+Requires Node 20+, pnpm 9+, Docker, and Supabase CLI (`npx supabase` works).
 
 ```bash
 pnpm install
+npx supabase start
+# copy URL + anon + service_role keys into apps/web/.env.local
+# (see apps/web/.env.example)
 
-# 1. Start local Supabase (Postgres + Auth + Studio on http://localhost:54323)
-pnpm supabase:start
-
-# 2. Copy env files and fill in the local Supabase URL/keys printed by
-#    `supabase start` (also visible via `supabase status`)
-cp apps/web/.env.example apps/web/.env.local
-cp apps/mobile/.env.example apps/mobile/.env
-
-# 3. Run the web app
 pnpm dev:web
 ```
 
-Visiting `/signup` creates an `auth.users` row; the `handle_new_user()`
-trigger (see `supabase/migrations/20260816120000_init_schema.sql`)
-automatically provisions an `organizations` row and an `owner` `profiles`
-row for that user — no manual setup required.
-
-### Google OAuth (local)
-
-Set `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` in your shell
-env before `supabase start` (referenced from `supabase/config.toml`), and
-add `http://localhost:3000/auth/callback` as an authorized redirect URI in
-the Google Cloud Console.
-
-### Regenerating types after a schema change
+Optional mobile:
 
 ```bash
-pnpm supabase:migrate:new <name>   # write the new migration
-pnpm supabase:reset                # apply migrations + seed locally
-pnpm supabase:gen:types            # regenerate apps/web/lib/database.types.ts
+cp apps/mobile/.env.example apps/mobile/.env
+# set EXPO_PUBLIC_* to the same local Supabase keys
+# EXPO_PUBLIC_API_URL=http://localhost:3000  (use your LAN IP on a physical device)
+pnpm dev:mobile
 ```
 
-## Database schema (Phase 1)
+### Stripe (optional for local)
 
-- **organizations** — billing/tenant boundary (`plan_status`: trial, active, past_due, canceled)
-- **profiles** — one row per `auth.users`, scoped to an `org_id`, role `owner`/`member`
-- **workflows** — React Flow `nodes`/`edges` JSONB graph (Phase 3)
-- **workflow_executions** — a single run of a workflow (Phase 4)
-- **approvals** — human-in-the-loop gates surfaced to the mobile app (Phase 5)
+Set `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, and
+`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. Forward webhooks to
+`/api/stripe/webhook`.
 
-Every table has Row Level Security enabled, scoped via a
-`current_org_id()` helper function that reads the caller's `profiles` row —
-no cross-tenant reads or writes are possible through the anon/authenticated
-Postgres roles.
+Without Stripe keys, owners can use **Activate Pro (dev)** on
+`/dashboard/billing`. Trial already has product access.
 
-## Roadmap
+## What you can do
 
-1. ✅ Monorepo, Supabase Auth, database schema + RLS
-2. Stripe Checkout + webhook-driven `plan_status` sync, paywall
-3. React Flow visual canvas + execution logs dashboard
-4. Backend execution engine + human-in-the-loop approval logic
-5. Mobile auth + Realtime approval inbox
+1. Sign up → org + owner profile (DB trigger)
+2. Create / edit workflows on a React Flow canvas
+3. Run workflows → agent simulation logs → pause on Approval nodes
+4. Approve / reject from web or mobile (engine resumes)
+5. Upgrade via Stripe or local Activate Pro
+
+See `docs/GUIA-DE-LA-APP.md` for a Spanish walkthrough.
+
+## Database
+
+Tables: `organizations`, `profiles`, `workflows`, `workflow_executions`,
+`approvals` — all RLS-scoped by `current_org_id()`.

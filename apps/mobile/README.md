@@ -1,18 +1,19 @@
-# IonexFlow — Mobile Companion (Expo)
+# IonexFlow Companion (mobile)
 
-Phase 1 scope: monorepo wiring only — Expo Router skeleton and a Supabase
-client (`lib/supabase.ts`) pointed at the **same** Supabase project as
-`apps/web`, so auth state and RLS policies are shared from day one.
+Expo app for human-in-the-loop **approvals**.
 
-Not implemented yet (Phase 5):
-- Login screen backed by `supabase.auth.signInWithPassword` / OAuth
-- Realtime subscription to `public.approvals` (`status = 'pending'`)
-- Approve / Reject actions writing back to `workflow_executions`
-- Push notifications for high-risk actions
-
-## Local dev
+## Setup
 
 ```bash
-cp .env.example .env
-pnpm --filter mobile dev
+cp apps/mobile/.env.example apps/mobile/.env
+# Same Supabase URL/anon key as web
+# EXPO_PUBLIC_API_URL=http://localhost:3000
+# On a physical device, use your PC LAN IP instead of localhost
+pnpm dev:mobile
 ```
+
+## Flows
+
+1. Sign in with the same email/password as the web app
+2. See pending `approvals` (Realtime)
+3. Approve / Reject → calls `POST /api/approvals/resolve` which resumes the execution engine
