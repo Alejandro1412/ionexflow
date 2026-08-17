@@ -5,7 +5,9 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type MutableRefObject,
   type ReactNode,
 } from "react";
 import { usePathname } from "next/navigation";
@@ -17,8 +19,8 @@ import {
 
 type SceneContextValue = {
   mode: SceneMode;
-  pointer: ScenePointer;
-  scrollProgress: number;
+  pointerRef: MutableRefObject<ScenePointer>;
+  scrollProgressRef: MutableRefObject<number>;
   reducedMotion: boolean;
   visible: boolean;
 };
@@ -36,8 +38,8 @@ export function useScene() {
 export function SceneProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
   const mode = useMemo(() => modeFromPathname(pathname), [pathname]);
-  const [pointer, setPointer] = useState<ScenePointer>({ x: 0, y: 0 });
-  const [scrollProgress, setScrollProgress] = useState(0);
+  const pointerRef = useRef<ScenePointer>({ x: 0, y: 0 });
+  const scrollProgressRef = useRef(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [visible, setVisible] = useState(true);
 
@@ -57,10 +59,12 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Refs only — avoid React re-renders on every pointermove (kills nav fluidity).
     const onMove = (event: PointerEvent) => {
-      const x = (event.clientX / window.innerWidth) * 2 - 1;
-      const y = (event.clientY / window.innerHeight) * 2 - 1;
-      setPointer({ x, y: -y });
+      pointerRef.current = {
+        x: (event.clientX / window.innerWidth) * 2 - 1,
+        y: -((event.clientY / window.innerHeight) * 2 - 1),
+      };
     };
     window.addEventListener("pointermove", onMove, { passive: true });
     return () => window.removeEventListener("pointermove", onMove);
@@ -68,12 +72,12 @@ export function SceneProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (mode !== "hero") {
-      setScrollProgress(0);
+      scrollProgressRef.current = 0;
       return;
     }
     const onScroll = () => {
       const max = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
-      setScrollProgress(Math.min(window.scrollY / max, 1));
+      scrollProgressRef.current = Math.min(window.scrollY / max, 1);
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -81,8 +85,8 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   }, [mode]);
 
   const value = useMemo(
-    () => ({ mode, pointer, scrollProgress, reducedMotion, visible }),
-    [mode, pointer, scrollProgress, reducedMotion, visible]
+    () => ({ mode, pointerRef, scrollProgressRef, reducedMotion, visible }),
+    [mode, pointerRef, scrollProgressRef, reducedMotion, visible]
   );
 
   return <SceneContext.Provider value={value}>{children}</SceneContext.Provider>;

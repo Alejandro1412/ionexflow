@@ -1,10 +1,12 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/database.types";
 
 export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 export type OrgRow = Database["public"]["Tables"]["organizations"]["Row"];
 
-export async function getSessionProfile() {
+/** Dedupes auth + profile fetches within a single RSC request. */
+export const getSessionProfile = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -25,4 +27,4 @@ export async function getSessionProfile() {
     profile: profile as ProfileRow,
     org,
   };
-}
+});

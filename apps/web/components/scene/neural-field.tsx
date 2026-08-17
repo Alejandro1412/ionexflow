@@ -4,13 +4,12 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useScene } from "@/components/scene/scene-provider";
-import { SCENE_COLORS, type SceneMode } from "@/components/scene/types";
+import { SCENE_COLORS } from "@/components/scene/types";
 
-function nodeCountForMode(mode: SceneMode, mobile: boolean) {
-  if (mode === "hero") return mobile ? 90 : 180;
-  if (mode === "auth") return mobile ? 50 : 100;
-  return mobile ? 35 : 70;
-}
+/** Keep buffer sizes stable across route changes — Three.js cannot resize attributes. */
+const DESKTOP_NODES = 120;
+const MOBILE_NODES = 60;
+const PULSE_COUNT = 24;
 
 function buildGraph(count: number, spread: number) {
   const positions = new Float32Array(count * 3);
@@ -40,9 +39,18 @@ function buildGraph(count: number, spread: number) {
     }
   }
 
+  const pulse = new Float32Array(PULSE_COUNT * 3);
+  for (let i = 0; i < PULSE_COUNT; i++) {
+    const p = points[i % points.length]!;
+    pulse[i * 3] = p.x;
+    pulse[i * 3 + 1] = p.y;
+    pulse[i * 3 + 2] = p.z;
+  }
+
   return {
     positions,
     linePositions: new Float32Array(segments),
+    pulsePositions: pulse,
     points,
   };
 }
@@ -51,26 +59,16 @@ export function NeuralField() {
   const { mode, reducedMotion, visible } = useScene();
   const group = useRef<THREE.Group>(null);
   const pulseRef = useRef<THREE.Points>(null);
+  const pointsRef = useRef<THREE.Vector3[]>([]);
 
   const mobile =
     typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches;
 
   const graph = useMemo(() => {
-    const count = nodeCountForMode(mode, mobile);
-    return buildGraph(count, mode === "hero" ? 14 : 11);
-  }, [mode, mobile]);
-
-  const pulsePositions = useMemo(() => {
-    const n = Math.min(24, Math.floor(graph.points.length / 4) || 1);
-    const arr = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) {
-      const p = graph.points[(i * 3) % graph.points.length] ?? graph.points[0]!;
-      arr[i * 3] = p.x;
-      arr[i * 3 + 1] = p.y;
-      arr[i * 3 + 2] = p.z;
-    }
-    return arr;
-  }, [graph]);
+    const built = buildGraph(mobile ? MOBILE_NODES : DESKTOP_NODES, 12);
+    pointsRef.current = built.points;
+    return built;
+  }, [mobile]);
 
   useFrame((state, delta) => {
     if (!visible || !group.current) return;
@@ -80,12 +78,12 @@ export function NeuralField() {
     group.current.rotation.x = Math.sin(t * 0.15) * 0.08;
 
     const pulse = pulseRef.current;
-    if (pulse && !reducedMotion) {
+    const bases = pointsRef.current;
+    if (pulse && !reducedMotion && bases.length > 0) {
       const attr = pulse.geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
-      if (!attr) return;
-      for (let i = 0; i < attr.count; i++) {
-        const base = graph.points[i % graph.points.length];
-        if (!base) continue;
+      if (!attr || attr.count !== PULSE_COUNT) return;
+      for (let i = 0; i < PULSE_COUNT; i++) {
+        const base = bases[i % bases.length]!;
         const wobble = Math.sin(t * 2 + i) * 0.15;
         attr.setXYZ(i, base.x + wobble, base.y + Math.cos(t * 1.4 + i) * 0.12, base.z);
       }
@@ -103,9 +101,7 @@ export function NeuralField() {
         <bufferGeometry>
           <bufferAttribute
             attach="attributes-position"
-            count={graph.positions.length / 3}
-            array={graph.positions}
-            itemSize={3}
+            args={[graph.positions, 3]}
           />
         </bufferGeometry>
         <pointsMaterial
@@ -122,9 +118,7 @@ export function NeuralField() {
         <bufferGeometry>
           <bufferAttribute
             attach="attributes-position"
-            count={graph.linePositions.length / 3}
-            array={graph.linePositions}
-            itemSize={3}
+            args={[graph.linePositions, 3]}
           />
         </bufferGeometry>
         <lineBasicMaterial
@@ -139,9 +133,7 @@ export function NeuralField() {
         <bufferGeometry>
           <bufferAttribute
             attach="attributes-position"
-            count={pulsePositions.length / 3}
-            array={pulsePositions}
-            itemSize={3}
+            args={[graph.pulsePositions, 3]}
           />
         </bufferGeometry>
         <pointsMaterial

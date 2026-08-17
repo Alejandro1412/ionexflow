@@ -1,33 +1,25 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/actions/auth";
 import { getSessionProfile } from "@/lib/org";
 import { hasProductAccess } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
+import { DashboardNav } from "@/components/dashboard/nav";
 
-const NAV = [
-  { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/workflows", label: "Workflows" },
-  { href: "/dashboard/executions", label: "Executions" },
-  { href: "/dashboard/approvals", label: "Approvals" },
-  { href: "/dashboard/billing", label: "Billing" },
-];
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
   const session = await getSessionProfile();
-  const locked = session?.org ? !hasProductAccess(session.org.plan_status) : false;
+  if (!session?.user) redirect("/login");
+
+  const locked = session.org ? !hasProductAccess(session.org.plan_status) : false;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -40,7 +32,7 @@ export default async function DashboardLayout({
             IonexFlow
           </Link>
           <div className="flex items-center gap-3">
-            {session?.org ? (
+            {session.org ? (
               <span className="hidden text-xs uppercase tracking-wider text-muted-foreground sm:inline">
                 {session.org.name} · {session.org.plan_status}
               </span>
@@ -52,29 +44,13 @@ export default async function DashboardLayout({
             </form>
           </div>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-4 pb-3">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-            >
-              {item.label}
-            </Link>
-          ))}
-          <Link
-            href="/pricing"
-            className="rounded-md px-3 py-1.5 text-sm text-signal transition hover:bg-signal/10"
-          >
-            Pricing
-          </Link>
-        </nav>
+        <DashboardNav />
       </header>
 
       {locked ? (
         <div className="border-b border-amber-500/30 bg-amber-500/10 px-6 py-3 text-sm text-amber-100">
           Your plan is{" "}
-          <strong>{session?.org?.plan_status}</strong>. Product features are locked —{" "}
+          <strong>{session.org?.plan_status}</strong>. Product features are locked —{" "}
           <Link href="/dashboard/billing" className="underline">
             fix billing
           </Link>

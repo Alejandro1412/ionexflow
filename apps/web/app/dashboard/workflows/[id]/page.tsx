@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/org";
 import { hasProductAccess } from "@/lib/billing";
-import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
+import { WorkflowCanvasLazy } from "@/components/workflow/workflow-canvas-lazy";
 import type { FlowEdge, FlowNode } from "@/lib/workflow/types";
 
 export default async function WorkflowEditorPage({
@@ -24,7 +24,7 @@ export default async function WorkflowEditorPage({
   if (!workflow) notFound();
 
   return (
-    <WorkflowCanvas
+    <WorkflowCanvasLazy
       workflowId={workflow.id}
       initialName={workflow.name}
       initialNodes={(workflow.nodes as FlowNode[]) ?? []}

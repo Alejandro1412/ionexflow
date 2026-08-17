@@ -7,7 +7,7 @@ import { useScene } from "@/components/scene/scene-provider";
 import { SCENE_COLORS } from "@/components/scene/types";
 
 export function OrbitCore() {
-  const { mode, pointer, scrollProgress, reducedMotion, visible } = useScene();
+  const { mode, pointerRef, scrollProgressRef, reducedMotion, visible } = useScene();
   const group = useRef<THREE.Group>(null);
   const core = useRef<THREE.Mesh>(null);
 
@@ -15,6 +15,8 @@ export function OrbitCore() {
     if (!visible || !group.current || mode !== "hero") return;
     const t = state.clock.elapsedTime;
     const motion = reducedMotion ? 0.15 : 1;
+    const pointer = pointerRef.current;
+    const scrollProgress = scrollProgressRef.current;
 
     group.current.rotation.y += delta * (0.35 + scrollProgress * 0.8) * motion;
     group.current.rotation.x = THREE.MathUtils.lerp(

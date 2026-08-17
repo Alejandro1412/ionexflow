@@ -1,9 +1,36 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = {
+  title: "IonexFlow — Autonomous AI Agent Workflows",
+  description:
+    "Orchestrate autonomous AI agent workflows visually — with live pulses, human approvals, and enterprise-grade control.",
+  alternates: { canonical: "/" },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "IonexFlow",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  description:
+    "Build, orchestrate, and monitor autonomous AI agent workflows visually.",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+};
 
 export default function LandingPage() {
   return (
     <div className="relative flex min-h-screen flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <header className="container flex items-center justify-between py-6 animate-fade-rise">
         <Link
           href="/"

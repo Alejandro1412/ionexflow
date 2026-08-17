@@ -7,7 +7,7 @@ import { useScene } from "@/components/scene/scene-provider";
 
 export function CameraRig() {
   const { camera } = useThree();
-  const { mode, pointer, scrollProgress, reducedMotion, visible } = useScene();
+  const { mode, pointerRef, scrollProgressRef, reducedMotion, visible } = useScene();
   const target = useRef(new THREE.Vector3());
 
   useFrame(() => {
@@ -15,6 +15,8 @@ export function CameraRig() {
 
     const strength =
       reducedMotion ? 0.08 : mode === "hero" ? 1 : mode === "auth" ? 0.45 : 0.2;
+    const pointer = pointerRef.current;
+    const scrollProgress = scrollProgressRef.current;
 
     const baseZ = mode === "hero" ? 8 - scrollProgress * 2.2 : mode === "auth" ? 9 : 10;
     const lookX = pointer.x * 1.4 * strength;

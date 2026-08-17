@@ -3,7 +3,21 @@
 import { signInWithGoogle } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 
+export function isGoogleAuthEnabled() {
+  return process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
+}
+
 export function GoogleButton() {
+  if (!isGoogleAuthEnabled()) {
+    return (
+      <p className="text-center text-xs text-muted-foreground">
+        Google sign-in is disabled until you set{" "}
+        <code className="text-signal">NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true</code> and
+        configure <code className="text-signal">GOOGLE_OAUTH_*</code> for Supabase.
+      </p>
+    );
+  }
+
   return (
     <form action={signInWithGoogle}>
       <Button type="submit" variant="outline" className="w-full gap-2">

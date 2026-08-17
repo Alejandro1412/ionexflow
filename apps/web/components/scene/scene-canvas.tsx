@@ -29,15 +29,19 @@ function SceneContent() {
 }
 
 export function SceneCanvas() {
+  const { mode } = useScene();
+  const appMode = mode === "app";
+
   return (
     <div
       aria-hidden
       className="pointer-events-none fixed inset-0 z-0 h-[100dvh] w-screen"
     >
       <Canvas
-        dpr={[1, 1.75]}
+        dpr={appMode ? [1, 1] : [1, 1.75]}
+        performance={{ min: appMode ? 0.4 : 0.5 }}
         gl={{
-          antialias: true,
+          antialias: !appMode,
           alpha: false,
           powerPreference: "high-performance",
         }}

@@ -9,12 +9,25 @@ function isPublicPath(pathname: string) {
   );
 }
 
+function hasAuthCookie(request: NextRequest) {
+  return request.cookies
+    .getAll()
+    .some((cookie) => cookie.name.includes("auth-token") || cookie.name.startsWith("sb-"));
+}
+
 /**
- * Refreshes the Supabase auth session on every request and redirects
- * unauthenticated users away from protected routes. Called from
- * apps/web/middleware.ts.
+ * Refreshes the Supabase auth session on protected (and cookied) requests.
+ * Public pages without auth cookies skip the network getUser() round-trip.
  */
 export async function updateSession(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const publicPath = isPublicPath(pathname);
+
+  // Fast path: marketing/API public routes with no session cookies.
+  if (publicPath && !hasAuthCookie(request)) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -38,15 +51,11 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // IMPORTANT: do not run any logic between createServerClient and
-  // this call — getUser() is what actually revalidates the token.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-
-  if (!user && !isPublicPath(pathname)) {
+  if (!user && !publicPath) {
     const redirectUrl = new URL("/login", request.url);
     redirectUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(redirectUrl);

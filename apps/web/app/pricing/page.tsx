@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,6 +8,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
+export const metadata: Metadata = {
+  title: "Pricing",
+  description:
+    "IonexFlow pricing — start on a free trial, upgrade for production billing and higher limits.",
+  alternates: { canonical: "/pricing" },
+};
 
 export default function PricingPage() {
   return (
