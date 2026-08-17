@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/pricing", "/auth"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/pricing", "/auth", "/api/stripe", "/api/approvals"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(
@@ -25,7 +25,7 @@ export async function updateSession(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
