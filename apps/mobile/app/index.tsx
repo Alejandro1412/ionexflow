@@ -1,17 +1,18 @@
-import { View, Text } from "react-native";
+import { Redirect } from "expo-router";
+import { ActivityIndicator, View } from "react-native";
+import { useAuth } from "@/lib/auth-context";
 
-// Placeholder screen. Phase 5 replaces this with:
-//   - a Supabase-authenticated login screen sharing the web app's session
-//   - a Realtime "Approval Inbox" list (public.approvals, status = pending)
-//   - Approve/Reject actions that update workflow_executions
-export default function CompanionHome() {
-  return (
-    <View className="flex-1 items-center justify-center gap-2 bg-white px-6">
-      <Text className="text-xl font-semibold">IonexFlow Companion</Text>
-      <Text className="text-center text-gray-500">
-        Monorepo + auth scaffolding (Phase 1). Login and the Realtime
-        approval inbox ship in Phase 5.
-      </Text>
-    </View>
-  );
+export default function Index() {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#05070F" }}>
+        <ActivityIndicator color="#3DFFF2" />
+      </View>
+    );
+  }
+
+  if (session) return <Redirect href="/approvals" />;
+  return <Redirect href="/login" />;
 }
