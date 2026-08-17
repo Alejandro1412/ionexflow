@@ -1,259 +1,283 @@
 # IonexFlow — Guía de la aplicación
 
-Documento paso a paso: **para qué sirve**, **qué puedes hacer hoy** y **cómo funciona por dentro**.
+Documento de producto: **qué es**, **qué puedes hacer hoy**, **qué falta**, **cómo usarla** y **un ejemplo real de negocio**.
 
-> Estado actual: **Fases 1–5 implementadas** (auth, billing, canvas, motor, móvil)  
-> Repo: [github.com/Alejandro1412/ionexflow](https://github.com/Alejandro1412/ionexflow)
-
----
-
-## 1. ¿Para qué es IonexFlow?
-
-**IonexFlow** es un SaaS B2B pensado para empresas que quieren:
-
-1. **Diseñar** flujos de trabajo con agentes de IA (de forma visual).
-2. **Orquestar** esos agentes (quién hace qué, en qué orden).
-3. **Monitorear** ejecuciones en tiempo real.
-4. **Aprobar o rechazar** pasos críticos desde el móvil (human-in-the-loop).
-5. **Cobrar** por plan (trial → suscripción Stripe).
-
-En resumen: es el **command center** (centro de mando) de agentes autónomos, con control humano y listo para monetizar.
-
-Hoy ya tienes el producto usable de punta a punta:
-
-1. Identidad + multi-tenant (org/profile/RLS)
-2. Billing (Stripe o Activate Pro en local)
-3. Canvas React Flow + CRUD de workflows
-4. Motor de ejecución con pausas de aprobación
-5. Inbox móvil Realtime
-
-El canvas, el motor y la app companion ya están cableados sobre el schema de Fase 1.
+> Estado: **Fases 1–5 implementadas** (auth, billing, canvas, motor, móvil)  
+> Repo: [github.com/Alejandro1412/ionexflow](https://github.com/Alejandro1412/ionexflow)  
+> Companion: [Estado funcional](./ESTADO-FUNCIONAL.md)
 
 ---
 
-## 2. ¿Qué puedes hacer HOY? (paso a paso)
+## 1. ¿Qué es IonexFlow?
 
-Asegúrate de tener corriendo:
+**IonexFlow** es un SaaS B2B: un *command center* para diseñar, ejecutar y supervisar **flujos de trabajo con agentes de IA**, con **aprobación humana** (web + móvil) y **cobro por plan**.
 
-- Docker Desktop
-- Supabase local (`pnpm supabase:start` o `npx supabase start`)
-- La web (`pnpm dev:web`) → normalmente [http://localhost:3000](http://localhost:3000)
+Sirve para equipos que necesitan:
 
-### Paso A — Ver la landing
+1. **Diseñar** un proceso visual (quién hace qué, en qué orden).
+2. **Ejecutar** ese proceso (hoy con agentes *simulados*; ver sección 5).
+3. **Pausar** en pasos críticos hasta que una persona apruebe o rechace.
+4. **Monitorear** logs y estado de cada corrida.
+5. **Cobrar** (trial → Stripe, o “Activate Pro” en local).
 
-1. Abre [http://localhost:3000](http://localhost:3000).
-2. Verás la marca **IonexFlow**, un fondo 3D (red neural + núcleo orbital) y botones para registrarte o entrar.
-3. Mueve el mouse: la cámara y el núcleo reaccionan.
-4. Haz scroll: la escena “entra” más hacia el núcleo.
-
-**Para qué sirve:** presentar el producto y llevarte al registro o login.
+Piensa en un “tablero de control” de operaciones automatizadas: no sustituye a Slack ni a un CRM; **orquesta** pasos automáticos y humanos en una sola línea de trabajo.
 
 ---
 
-### Paso B — Crear una cuenta (signup)
+## 2. Resumen: qué HAY vs qué FALTA
 
-1. Ve a [http://localhost:3000/signup](http://localhost:3000/signup) o pulsa **Get started / Start free trial**.
-2. Completa:
-   - **Full name** — tu nombre
-   - **Organization name** — nombre de tu empresa/equipo
-   - **Work email** — correo
-   - **Password** — mínimo 8 caracteres
-3. Pulsa **Create account**.
+### Hay (usable hoy en local)
 
-**Qué ocurre por detrás (automático):**
-
-1. Supabase Auth crea el usuario en `auth.users`.
-2. Un trigger SQL (`handle_new_user`) crea:
-   - una fila en **`organizations`** (tu empresa, plan `trial`);
-   - una fila en **`profiles`** (tú como **owner** de esa org).
-3. Quedas con sesión iniciada y te redirige al **dashboard**.
-
-No tienes que crear la organización a mano: el signup la provisiona.
-
----
-
-### Paso C — Iniciar sesión (login)
-
-1. Ve a [http://localhost:3000/login](http://localhost:3000/login).
-2. Introduce email y password.
-3. Si son correctos → `/dashboard`.
-4. Si fallan → mensaje de error en el formulario.
-
-Si ya tienes sesión y visitas `/login` o `/signup`, el middleware te manda al dashboard.
-
----
-
-### Paso D — Google OAuth (opcional)
-
-En la pantalla de login/signup hay un botón de Google.
-
-**Solo funciona si configuraste:**
-
-- `GOOGLE_OAUTH_CLIENT_ID` y `GOOGLE_OAUTH_CLIENT_SECRET` antes de arrancar Supabase
-- En Google Cloud, el redirect: `http://localhost:3000/auth/callback`
-
-Si no está configurado, el botón puede fallar. El flujo email/password sí funciona sin Google.
-
----
-
-### Paso E — Usar el dashboard
-
-1. Entra a [http://localhost:3000/dashboard](http://localhost:3000/dashboard) (requiere login).
-2. Verás:
-   - Saludo con tu nombre
-   - Tarjeta **Organization** con:
-     - nombre de la org
-     - **plan status** (ahora `trial`)
-     - tu **rol** (`owner`)
-3. Botón **Sign out** para cerrar sesión → vuelves a `/login`.
-
-**Para qué sirve hoy:** confirmar que tu cuenta, org y permisos están bien.  
-**Qué no hace aún:** no hay canvas de workflows ni ejecuciones; es un placeholder de Fase 1.
-
----
-
-### Paso F — Explorar Supabase Studio (opcional, para ti como builder)
-
-1. Abre [http://127.0.0.1:54323](http://127.0.0.1:54323).
-2. Revisa tablas: `organizations`, `profiles`, `workflows`, etc.
-3. Tras un signup verás tu org y tu profile creados.
-
----
-
-## 3. Mapa de pantallas (web)
-
-| URL | ¿Quién puede entrar? | Qué hace |
-|-----|----------------------|----------|
-| `/` | Todos | Landing + escena 3D hero |
-| `/signup` | Público (si no hay sesión) | Crear cuenta + org |
-| `/login` | Público (si no hay sesión) | Entrar |
-| `/auth/callback` | Sistema (OAuth) | Intercambia código por sesión |
-| `/auth/auth-code-error` | Público | Error de OAuth |
-| `/dashboard` | Solo autenticados | Panel de la org (placeholder) |
-
-La app móvil (`apps/mobile`) existe como esqueleto Expo, pero **aún no** tiene login ni bandeja de aprobaciones (eso es Fase 5).
-
----
-
-## 4. Cómo está organizado el proyecto
-
-```
-ionexflow/
-├── apps/
-│   ├── web/       ← Command Center (Next.js) — lo que usas en el navegador
-│   └── mobile/    ← Companion móvil (Expo) — futuro
-├── packages/
-│   ├── config/    ← TypeScript / ESLint compartidos
-│   └── ui/        ← Componentes compartidos (vacío hasta Fase 3)
-├── supabase/
-│   ├── migrations/← Esquema SQL + RLS + trigger de signup
-│   ├── config.toml
-│   └── seed.sql
-└── docs/          ← Specs y esta guía
-```
-
-| Pieza | Tecnología |
-|-------|------------|
-| Web | Next.js 14, React 18, Tailwind |
-| Auth / DB | Supabase (Auth + PostgreSQL + RLS) |
-| Monorepo | Turborepo + pnpm |
-| 3D | Three.js + React Three Fiber |
-
----
-
-## 5. Modelo de datos (qué guarda el sistema)
-
-### Tablas principales
-
-| Tabla | Para qué |
-|-------|----------|
-| **organizations** | La empresa/tenant. Aquí vivirá el estado de plan (`trial`, `active`, …) y luego IDs de Stripe. |
-| **profiles** | Un perfil por usuario. Lo une a una org y define rol (`owner` / `member`). |
-| **workflows** | Futuros grafos visuales (nodos/edges JSON). Fase 3. |
-| **workflow_executions** | Cada corrida de un workflow. Fase 4. |
-| **approvals** | Decisiones humanas (aprobar/rechazar un paso). Fase 5 + móvil. |
-
-### Seguridad (RLS)
-
-Cada consulta está limitada a **tu organización**. Un usuario de la org A no puede leer datos de la org B. Eso se hace con Row Level Security y helpers como `current_org_id()`.
-
----
-
-## 6. Flujo completo de un usuario nuevo (diagrama mental)
-
-```
-Landing (/)
-    │
-    ▼
-Signup (nombre, org, email, password)
-    │
-    ▼
-Supabase Auth crea el usuario
-    │
-    ▼
-Trigger SQL crea Organization (trial) + Profile (owner)
-    │
-    ▼
-Sesión activa → Dashboard
-    │
-    ▼
-Ves tu org y tu rol → Sign out cuando quieras
-```
-
----
-
-## 7. La UI 3D (qué es y para qué)
-
-En **toda** la web hay un canvas Three.js de fondo:
-
-- **Red neural** (nodos + conexiones + pulsos) → metáfora de agentes y flujos.
-- **Núcleo orbital** (solo en la landing) → “corazón” del sistema; reacciona al mouse y al scroll.
-- En **login/signup** y **dashboard** la red sigue, pero más calmada (no compite con formularios ni datos).
-
-No es el producto de negocio en sí: es la **experiencia de marca** inmersiva. Los formularios y botones siguen siendo usables (el canvas no captura clics).
-
----
-
-## 8. Qué NO puedes hacer todavía (roadmap)
-
-| Fase | Qué llegará |
+| Área | Qué incluye |
 |------|-------------|
-| **2** | Stripe: pagar, webhooks, paywall si el plan no es `trial`/`active` |
-| **3** | Canvas visual (React Flow) para diseñar workflows + logs |
-| **4** | Motor que ejecuta el grafo (agentes, pausas, errores) |
-| **5** | App móvil: login + bandeja de aprobaciones en tiempo real |
+| **Auth** | Signup/login email+password; org + profile automáticos; sesión protegida en `/dashboard` |
+| **Google OAuth** | Cableado (Supabase + botón); requiere claves Google y flag |
+| **Dashboard** | Overview con conteos, nav (Workflows, Executions, Approvals, Billing) |
+| **Workflows** | CRUD, editor React Flow, guardar, ejecutar |
+| **Motor** | Recorre Start → Agent → Approval → End; pausa y reanuda |
+| **Approvals** | Inbox web; Approve/Reject; resume de la ejecución |
+| **Billing** | Pricing; paywall si el plan no es trial/active; Stripe o Activate Pro (dev) |
+| **Móvil** | Login + inbox Realtime de approvals pendientes |
+| **SEO / perf** | Metadata, robots, sitemap, OG; Three.js solo en landing/auth; canvas lazy |
 
-Hasta entonces, tablas como `workflows` / `approvals` existen en la base, pero la UI aún no las usa.
+### Falta / limitaciones importantes
+
+| Hueco | Detalle |
+|-------|---------|
+| **Agentes ≠ LLM real** | El nodo *Agent* **no llama** a OpenAI/Anthropic. Escribe un log simulado con el prompt. Es la base del producto, no la inteligencia final. |
+| **Grafos lineales** | Solo se sigue la **primera** arista saliente. No hay ramas if/else ni paralelismo. |
+| **Tipos de nodo** | Solo `start`, `agent`, `approval`, `end`. |
+| **Stripe producción** | Sin claves Stripe no hay Checkout real (usa Activate Pro en local). |
+| **Google OAuth** | Sin Client ID/Secret + redirect en Google Cloud no entra. |
+| **Móvil** | No hay signup, editor de workflows, billing ni Google en la app. |
+| **Multi-miembro** | El modelo tiene `owner`/`member`, pero la UI no invita usuarios aún. |
+| **`packages/ui`** | Vacío; la UI vive en `apps/web/components/ui`. |
+| **Producción cloud** | Documentado para local; deploy (Vercel + Supabase cloud) no está guiado aquí. |
 
 ---
 
-## 9. Cómo arrancar el entorno (resumen)
+## 3. Qué puedes hacer en la app (paso a paso)
+
+Requisitos: Docker, Supabase local, `pnpm dev:web` → [http://localhost:3000](http://localhost:3000).
+
+### 3.1 Landing (`/`)
+
+- Marca IonexFlow + escena 3D (red neural + núcleo).
+- CTAs a signup / login.
+- La escena **no** corre en el dashboard (mejor rendimiento).
+
+### 3.2 Crear cuenta (`/signup`)
+
+Campos: nombre, nombre de organización, email, password (≥ 8).
+
+Al crear cuenta, automáticamente:
+
+1. Usuario en Supabase Auth.
+2. Organización en plan **`trial`**.
+3. Perfil como **`owner`**.
+4. Redirección al dashboard.
+
+### 3.3 Login (`/login`)
+
+Email/password. Si ya hay sesión, middleware te manda al dashboard.
+
+**Google:** solo si configuraste OAuth (ver [ESTADO-FUNCIONAL](./ESTADO-FUNCIONAL.md)).
+
+### 3.4 Overview (`/dashboard`)
+
+- Saludo y datos de la org (nombre, plan, rol).
+- Conteos: workflows, ejecuciones, approvals pendientes.
+- Atajos a workflows, approvals y billing.
+
+### 3.5 Workflows (`/dashboard/workflows`)
+
+- Listar y crear workflows.
+- Abrir el editor (`/dashboard/workflows/[id]`):
+  - Añadir nodos (Start, Agent, Approval, End).
+  - Conectar, editar labels/prompts/mensajes.
+  - **Save** y **Run**.
+
+Plantilla por defecto: **Start → Research agent → Human approval → End**.
+
+### 3.6 Ejecuciones (`/dashboard/executions`)
+
+- Lista de corridas (estado: running, paused, completed, failed).
+- Detalle con **logs** de cada paso.
+
+Al pulsar **Run**, si hay un nodo Approval, la ejecución queda **`paused`** hasta que alguien decida.
+
+### 3.7 Approvals (`/dashboard/approvals`)
+
+- Inbox de pendientes.
+- **Approve** → el motor continúa hasta End (o siguiente nodo).
+- **Reject** → la ejecución falla / se cierra según la lógica del resolver.
+
+Misma API usada por el móvil: `POST /api/approvals/resolve`.
+
+### 3.8 Billing y Pricing
+
+- `/pricing` — planes (marketing).
+- `/dashboard/billing` — Checkout Stripe **o** **Activate Pro (dev)** si no hay claves.
+- Si el plan no es `trial`/`active`, el producto bloquea features (paywall).
+
+### 3.9 App móvil (`apps/mobile`)
+
+1. Login email/password (mismas credenciales Supabase).
+2. Lista de approvals pendientes (Realtime).
+3. Approve / Reject llamando a la API de la web.
+
+En dispositivo físico: `EXPO_PUBLIC_API_URL` debe ser la **IP LAN** del PC, no `localhost`.
+
+---
+
+## 4. Mapa de pantallas
+
+| URL | Acceso | Función |
+|-----|--------|---------|
+| `/` | Público | Landing + 3D |
+| `/pricing` | Público | Precios |
+| `/signup` / `/login` | Público | Cuenta |
+| `/auth/callback` | Sistema | OAuth |
+| `/dashboard` | Autenticado | Overview |
+| `/dashboard/workflows` | Autenticado | Lista |
+| `/dashboard/workflows/[id]` | Autenticado | Editor + Run |
+| `/dashboard/executions` | Autenticado | Historial |
+| `/dashboard/executions/[id]` | Autenticado | Logs |
+| `/dashboard/approvals` | Autenticado | Inbox humano |
+| `/dashboard/billing` | Autenticado | Plan / Stripe |
+
+---
+
+## 5. Motor y tipos de nodo (importante)
+
+| Nodo | Qué hace hoy |
+|------|----------------|
+| **Start** | Arranca; registra el trigger en logs. |
+| **Agent** | Simula trabajo: log del tipo “analizó payload con prompt X”. **Sin LLM.** |
+| **Approval** | Crea fila en `approvals`, pausa la ejecución. |
+| **End** | Marca la corrida como `completed`. |
+
+Límites del motor:
+
+- Máximo ~100 visitas a nodos (anti-bucles).
+- Debe existir Start y End.
+- Una sola arista saliente efectiva por nodo.
+
+Cuando conectes un LLM real, el cambio natural es reemplazar el cuerpo del nodo **Agent** en `apps/web/lib/engine/runner.ts` por una llamada a tu proveedor, manteniendo el resto del orquestador.
+
+---
+
+## 6. Modelo de datos (resumen)
+
+| Tabla | Rol |
+|-------|-----|
+| `organizations` | Tenant + `plan_status` + IDs Stripe |
+| `profiles` | Usuario ↔ org + rol |
+| `workflows` | Grafo JSON (`nodes` / `edges`) |
+| `workflow_executions` | Cada corrida + logs + status |
+| `approvals` | Decisiones humanas por nodo |
+
+Todo filtrado por **RLS** a tu organización.
+
+---
+
+## 7. Ejemplo real: qué podrías hacer con IonexFlow
+
+### Escenario: agencia de contenido / marketing
+
+**Empresa:** “Norte Digital”, 8 personas. Publican posts y creatividades para clientes. Antes de publicar algo sensible (marca, claims legales, precio), un **director de cuenta** debe aprobar.
+
+### Flujo que diseñarían en el canvas
+
+```
+Start
+  → Agent “Brief research”
+       (prompt: resume brief del cliente + tono de marca)
+  → Agent “Draft copy”
+       (prompt: genera 3 variantes de copy para LinkedIn)
+  → Approval “Director de cuenta”
+       (mensaje: “Revisa copy y claims antes de publicar”)
+  → Agent “Schedule publish”
+       (prompt: prepara payload para Buffer/Hootsuite)
+  → End
+```
+
+### Qué pasa en la práctica (hoy vs mañana)
+
+| Paso | Hoy en IonexFlow | Con LLM + integraciones (futuro) |
+|------|------------------|-----------------------------------|
+| Research / Draft | Logs simulados con el prompt | GPT/Claude generan texto real |
+| Approval | Pausan la corrida; el director aprueba en **web o móvil** en el metro | Igual — esa parte **ya está** |
+| Publish | Log simulado | Webhook a Buffer, Notion, Slack |
+| Billing | Trial / Activate Pro / Stripe | Mismo modelo SaaS por sede |
+
+### Por qué tiene sentido el producto
+
+- El valor no es “otro chat GPT”: es **proceso + control**.
+- Compliance y marca: nada sale sin **Approval**.
+- El móvil cierra el loop: el director no necesita abrir el laptop.
+- Cada corrida deja **auditoría** (executions + logs).
+
+Otros ejemplos del mismo patrón:
+
+- **Soporte:** Agent resume ticket → Approval supervisor → Agent responde.
+- **Ventas:** Agent califica lead → Approval AE → Agent crea oportunidad en CRM.
+- **Ops / finanzas:** Agent arma reporte de gastos → Approval CFO → End.
+
+---
+
+## 8. Cómo arrancar (local)
 
 ```bash
-# En la carpeta ionexflow/
+cd ionexflow
 pnpm install
-npx supabase start          # o pnpm supabase:start si tienes la CLI en PATH
-# Copia keys de `npx supabase status` a apps/web/.env.local
+npx supabase start
+# Copia URL + anon + service_role de `npx supabase status` → apps/web/.env.local
 pnpm dev:web
 ```
 
-URLs útiles:
-
 | Servicio | URL |
 |----------|-----|
-| App web | http://localhost:3000 |
+| Web | http://localhost:3000 |
 | Supabase Studio | http://127.0.0.1:54323 |
-| API Supabase | http://127.0.0.1:54321 |
+| API | http://127.0.0.1:54321 |
 
-Variables web (`.env.local`):
+Opcional móvil:
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `NEXT_PUBLIC_SITE_URL=http://localhost:3000`
+```bash
+cp apps/mobile/.env.example apps/mobile/.env
+pnpm dev:mobile
+```
+
+Smoke automatizado: `node scripts/smoke-e2e.mjs`
+
+Google OAuth local: ver `scripts/restart-supabase-google.ps1` y [ESTADO-FUNCIONAL](./ESTADO-FUNCIONAL.md).
+
+---
+
+## 9. Arquitectura del monorepo
+
+```
+ionexflow/
+├── apps/web/          Next.js — command center
+├── apps/mobile/       Expo — approvals companion
+├── packages/config/   TS / ESLint compartidos
+├── packages/ui/       (placeholder)
+├── supabase/          Migraciones, RLS, Realtime
+├── scripts/           Smoke E2E, reinicio Google OAuth
+└── docs/              Esta guía + estado funcional
+```
+
+| Capa | Stack |
+|------|--------|
+| Web | Next.js 14, React 18, Tailwind, React Flow |
+| Auth/DB | Supabase Auth + Postgres + RLS + Realtime |
+| 3D (marketing) | Three.js / R3F (solo landing y auth) |
+| Billing | Stripe (opcional) |
+| Móvil | Expo Router |
 
 ---
 
 ## 10. En una frase
 
-**IonexFlow** será la plataforma para diseñar, ejecutar y supervisar flujos de agentes de IA con aprobaciones humanas y cobro B2B; **hoy** ya puedes registrarte, pertenecer a una organización en trial, entrar al dashboard y vivir la experiencia visual del command center, mientras el resto del producto se construye encima de esta base.
+**IonexFlow** es la plataforma para diseñar y supervisar flujos de agentes con **pausas humanas** y cobro B2B; **hoy** ya puedes registrarte, dibujar un workflow, ejecutarlo, aprobarlo en web/móvil y gestionar el plan — con agentes aún **simulados** listos para enchufar un LLM real.

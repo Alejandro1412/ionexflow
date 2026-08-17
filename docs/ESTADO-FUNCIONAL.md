@@ -1,35 +1,56 @@
-# Estado funcional (smoke test local)
+# Estado funcional
 
-Última verificación automatizada: `node scripts/smoke-e2e.mjs`
+Última alineación con el código: Fases 1–5 + optimizaciones SEO/perf.  
+Smoke: `node scripts/smoke-e2e.mjs`
 
-## Funciona ahora
+## Qué funciona ahora
 
-| Área | Estado |
-|------|--------|
-| Landing `/` | OK |
-| Signup / login email+password | OK |
-| Provisioning org+profile (trigger) | OK |
-| Dashboard protegido | OK |
-| Workflows CRUD + canvas | OK (vía API/DB + UI) |
-| Ejecutar → pausa en Approval | OK |
-| Approve/Reject web + API móvil | OK (resume a `completed`) |
-| Billing Activate Pro (dev) | OK |
-| Pricing page | OK |
-| Escena Three.js (buffers estables) | OK (fix aplicado) |
-| RLS + grants SQL | OK (migración de grants) |
+| Área | Estado | Notas |
+|------|--------|-------|
+| Landing `/` | OK | Escena 3D solo aquí / auth |
+| Signup / login email+password | OK | Trigger crea org `trial` + profile `owner` |
+| Dashboard overview | OK | Conteos + nav activa |
+| Workflows CRUD + canvas | OK | React Flow lazy-load |
+| Ejecutar workflow | OK | Motor in-process |
+| Pausa en Approval | OK | Status `paused` + fila `approvals` |
+| Approve / Reject (web) | OK | Resume a `completed` / fail |
+| API móvil `/api/approvals/resolve` | OK | Bearer token |
+| Inbox móvil Realtime | OK | Requiere Expo + env |
+| Billing Activate Pro (dev) | OK | Sin claves Stripe |
+| Pricing | OK | |
+| Paywall plan no trial/active | OK | |
+| RLS + grants SQL | OK | Migración de grants |
+| SEO (metadata, robots, sitemap, OG) | OK | Dashboard `noindex` |
+| Perf dashboard (sin Three.js) | OK | |
 
-## No funciona sin tu configuración externa
+## Qué falta o es limitado
+
+| Área | Estado | Qué implica |
+|------|--------|-------------|
+| **Nodos Agent → LLM** | No implementado | Solo logs simulados; no hay OpenAI/Anthropic |
+| **Ramas / paralelo** | No | Solo primera arista saliente |
+| **Más tipos de nodo** | No | Solo start / agent / approval / end |
+| **Invitar miembros** | No | Rol `member` existe en DB, sin UI |
+| **Signup / editor en móvil** | No | Solo login + approvals |
+| **Deploy cloud documentado** | Parcial | Flujo local es el soportado en docs |
+| **packages/ui compartido** | Vacío | UI en `apps/web` |
+
+## Requiere tu configuración externa
 
 | Área | Qué falta |
 |------|-----------|
-| **Google OAuth** | Crear OAuth Client en Google Cloud + `GOOGLE_OAUTH_CLIENT_ID/SECRET` y reiniciar Supabase. El botón queda deshabilitado hasta `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`. |
-| **Stripe Checkout real** | `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, webhook. Mientras tanto usa **Activate Pro (dev)** en `/dashboard/billing`. |
-| **Expo en dispositivo físico** | `EXPO_PUBLIC_*` + `EXPO_PUBLIC_API_URL` con IP LAN (no `localhost`). |
+| **Google OAuth** | OAuth Client (Web) en Google Cloud; redirect `http://127.0.0.1:54321/auth/v1/callback`; `GOOGLE_OAUTH_*` en `.env` raíz; `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`; reiniciar con `scripts/restart-supabase-google.ps1` |
+| **Stripe Checkout real** | `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` + webhook a `/api/stripe/webhook`. Sin eso: **Activate Pro (dev)** |
+| **Expo en dispositivo físico** | `EXPO_PUBLIC_*` + `EXPO_PUBLIC_API_URL` con IP LAN (no `localhost`) |
 
-## Cómo probar tú en el navegador
+## Cómo probar en el navegador (ruta feliz)
 
-1. `/signup` con email/password (no Google)
-2. `/dashboard/workflows` → New workflow → **Run**
-3. `/dashboard/approvals` → Approve
-4. Ver logs en `/dashboard/executions`
-5. `/dashboard/billing` → Activate Pro (dev) si quieres plan `active`
+1. `/signup` (email/password).
+2. `/dashboard/workflows` → New workflow → abrir → **Run**.
+3. `/dashboard/approvals` → **Approve**.
+4. `/dashboard/executions/[id]` → ver logs `completed`.
+5. Opcional: `/dashboard/billing` → Activate Pro (dev).
+
+## Guía larga
+
+Ver [GUIA-DE-LA-APP.md](./GUIA-DE-LA-APP.md) (incluye ejemplo real de negocio y mapa de pantallas).
