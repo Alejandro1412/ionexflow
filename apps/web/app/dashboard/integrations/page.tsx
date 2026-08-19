@@ -14,6 +14,7 @@ import {
   SyncMailboxButton,
 } from "@/components/email/connect-mailbox-form";
 import { ConnectWhatsAppForm } from "@/components/whatsapp/connect-whatsapp-form";
+import { ConnectVoiceForm } from "@/components/voice/connect-voice-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +49,7 @@ export default async function IntegrationsPage() {
     { data: workflows },
     { data: recentMail },
     { data: waConnections },
+    { data: voiceConnections },
   ] = await Promise.all([
     supabase
       .from("email_connections")
@@ -74,6 +76,13 @@ export default async function IntegrationsPage() {
       )
       .eq("org_id", session.org!.id)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("voice_connections")
+      .select(
+        "id, status, display_name, inbound_token, default_workflow_id, last_error, created_at"
+      )
+      .eq("org_id", session.org!.id)
+      .order("created_at", { ascending: true }),
   ]);
 
   const active =
@@ -82,7 +91,11 @@ export default async function IntegrationsPage() {
   const waActive =
     (waConnections ?? []).find((c) => c.status === "active") ||
     (waConnections ?? [])[0];
+  const voiceActive =
+    (voiceConnections ?? []).find((c) => c.status === "active") ||
+    (voiceConnections ?? [])[0];
   const webhookUrl = `${siteUrl()}/api/whatsapp/webhook`;
+  const voiceWebhookUrl = `${siteUrl()}/api/voice/webhook`;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -324,6 +337,71 @@ export default async function IntegrationsPage() {
             </div>
           ) : (
             <ConnectWhatsAppForm workflows={workflows ?? []} />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Voice inbound</CardTitle>
+          <CardDescription>
+            Webhook compatible con Twilio (transcript + From). Dispara el mismo
+            motor de workflows que email/WhatsApp.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {voiceActive?.status === "active" ? (
+            <div className="space-y-3 rounded-lg border border-signal/30 bg-signal/5 p-4 text-sm">
+              <p>
+                <span className="font-semibold">{voiceActive.display_name}</span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                POST{" "}
+                <code className="text-signal">
+                  {voiceWebhookUrl}?token={voiceActive.inbound_token}
+                </code>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Body JSON:{" "}
+                <code>{`{ "transcript": "...", "From": "+52..." }`}</code> o
+                form Twilio SpeechResult / From / CallSid.
+              </p>
+              <form
+                action={async (formData) => {
+                  "use server";
+                  const { upsertVoiceConnection } = await import("@/actions/voice");
+                  await upsertVoiceConnection(null, formData);
+                }}
+              >
+                <input
+                  type="hidden"
+                  name="display_name"
+                  value={voiceActive.display_name}
+                />
+                <div className="flex flex-wrap gap-3">
+                  <select
+                    name="default_workflow_id"
+                    defaultValue={voiceActive.default_workflow_id ?? ""}
+                    className="rounded-md border border-white/10 bg-black/40 px-2 py-2 text-sm"
+                  >
+                    <option value="">— workflow —</option>
+                    {(workflows ?? []).map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button type="submit" size="sm" variant="outline">
+                    Save routing
+                  </Button>
+                </div>
+              </form>
+              {voiceActive.last_error ? (
+                <p className="text-amber-200">{voiceActive.last_error}</p>
+              ) : null}
+            </div>
+          ) : (
+            <ConnectVoiceForm workflows={workflows ?? []} />
           )}
         </CardContent>
       </Card>

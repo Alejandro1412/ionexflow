@@ -4,7 +4,7 @@ B2B command center for designing, running, and supervising AI agent workflows
 with human-in-the-loop approvals, automation templates, email IMAP/SMTP, and
 an in-app guide (Ionex Assistant).
 
-> **Status:** Production — WhatsApp, Knowledge, NL→workflow builder, plus HITL/Test run/versions.  
+> **Status:** Production — Monitors, Insights, Voice, Browser/Extract nodes, industry templates + WhatsApp/Knowledge/NL.  
 > **Ops docs:** [`docs/MANUAL-COMPLETO.md`](docs/MANUAL-COMPLETO.md) (paso a paso exhaustivo).
 
 ## Stack

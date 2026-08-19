@@ -31,6 +31,8 @@ async function runTick() {
     scheduledRuns: 0,
     reapedStuck: 0,
     escalatedApprovals: 0,
+    monitorsChecked: 0,
+    monitorsTriggered: 0,
     errors: [] as string[],
   };
 
@@ -219,6 +221,76 @@ async function runTick() {
   } catch (error) {
     summary.errors.push(
       `claim schedules: ${error instanceof Error ? error.message : "fail"}`
+    );
+  }
+
+  // 4) Proactive business monitors
+  try {
+    const { evaluateMonitorValue } = await import("@/lib/monitors/evaluate");
+    const { data: claimedMonitors, error: monError } = await admin.rpc(
+      "claim_due_monitors",
+      { p_limit: 25 }
+    );
+    if (monError) {
+      summary.errors.push(`claim monitors: ${monError.message}`);
+    } else {
+      for (const row of claimedMonitors ?? []) {
+        summary.monitorsChecked += 1;
+        try {
+          const { data: monitor } = await admin
+            .from("business_monitors")
+            .select("*")
+            .eq("id", row.id)
+            .single();
+          if (!monitor?.workflow_id) continue;
+
+          const { value, triggered } = await evaluateMonitorValue(
+            admin,
+            monitor
+          );
+          await admin
+            .from("business_monitors")
+            .update({
+              last_value: value,
+              last_error: null,
+              updated_at: new Date().toISOString(),
+              ...(triggered
+                ? { last_triggered_at: new Date().toISOString() }
+                : {}),
+            })
+            .eq("id", monitor.id);
+
+          if (!triggered) continue;
+
+          await startWorkflowRun(admin, {
+            orgId: monitor.org_id,
+            workflowId: monitor.workflow_id,
+            triggerPayload: {
+              input:
+                monitor.notify_message ||
+                `Monitor "${monitor.name}" triggered: value ${value} ${monitor.operator} ${monitor.threshold}`,
+              channel: "monitor",
+              monitorId: monitor.id,
+              monitorName: monitor.name,
+              monitorValue: value,
+              monitorThreshold: monitor.threshold,
+              startedBy: "cron-monitor",
+              orgId: monitor.org_id,
+            },
+          });
+          summary.monitorsTriggered += 1;
+        } catch (error) {
+          summary.errors.push(
+            `monitor ${row.id}: ${
+              error instanceof Error ? error.message : "fail"
+            }`
+          );
+        }
+      }
+    }
+  } catch (error) {
+    summary.errors.push(
+      `claim monitors: ${error instanceof Error ? error.message : "fail"}`
     );
   }
 

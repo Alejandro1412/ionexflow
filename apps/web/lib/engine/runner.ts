@@ -396,6 +396,129 @@ async function runWhatsAppNode(options: {
   }
 }
 
+async function runBrowserAgentNode(options: {
+  node: FlowNode;
+  data: FlowNodeData;
+  logs: ExecutionLogEntry[];
+  context: Record<string, string>;
+  triggerPayload: Record<string, unknown>;
+  dryRun?: boolean;
+}): Promise<"ok" | { error: string }> {
+  const { node, data, logs, context, triggerPayload, dryRun } = options;
+  const vars = templateVars(data, logs, context, triggerPayload);
+  const failOnError = data.failOnError !== false;
+  const url = renderTemplate(
+    data.browserUrl?.trim() || data.url?.trim() || "",
+    vars
+  ).trim();
+  const stepsJson = renderTemplate(
+    data.browserStepsJson?.trim() || "[]",
+    vars
+  );
+
+  logs.push(log(node.id, `Browser agent → ${url || "(no url)"}…`));
+
+  try {
+    const { runBrowserAgentSteps } = await import("@/lib/browser/worker");
+    const result = await runBrowserAgentSteps({
+      url,
+      stepsJson,
+      dryRun,
+    });
+    context[data.label] = result.output;
+    logs.push(
+      log(
+        node.id,
+        result.ok
+          ? `Browser agent (${result.provider})`
+          : result.error ?? "Browser agent failed",
+        result.ok ? "success" : "error",
+        {
+          kind: "agent_output",
+          output: result.output,
+          provider: result.provider,
+        }
+      )
+    );
+    if (!result.ok && failOnError) {
+      return { error: result.error ?? "Browser agent failed" };
+    }
+    return "ok";
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Browser agent failed";
+    logs.push(log(node.id, message, "error"));
+    return { error: message };
+  }
+}
+
+async function runDocumentExtractNode(options: {
+  node: FlowNode;
+  data: FlowNodeData;
+  logs: ExecutionLogEntry[];
+  context: Record<string, string>;
+  triggerPayload: Record<string, unknown>;
+  orgId?: string;
+  dryRun?: boolean;
+}): Promise<"ok" | { error: string }> {
+  const { node, data, logs, context, triggerPayload, orgId, dryRun } = options;
+  const vars = templateVars(data, logs, context, triggerPayload);
+  const documentText = renderTemplate(
+    data.documentTemplate?.trim() || "{{body}}",
+    vars
+  ).trim();
+
+  if (!documentText) {
+    const message = `document_extract "${data.label}" has empty document text`;
+    logs.push(log(node.id, message, "error"));
+    return { error: message };
+  }
+
+  if (dryRun) {
+    const summary = `[dry-run] would extract fields from ${documentText.length} chars`;
+    context[data.label] = summary;
+    logs.push(
+      log(node.id, summary, "warn", {
+        kind: "agent_output",
+        output: summary,
+        provider: "dry-run",
+      })
+    );
+    return "ok";
+  }
+
+  logs.push(log(node.id, "Extracting document fields…"));
+
+  try {
+    const { extractDocumentFields } = await import("@/lib/documents/extract");
+    const result = await extractDocumentFields({
+      orgId: orgId || String(triggerPayload.orgId ?? ""),
+      documentText,
+      fieldsHint: data.extractFields,
+      label: data.label,
+    });
+    context[data.label] = result.output;
+    logs.push(
+      log(node.id, "Document fields extracted", "success", {
+        kind: "agent_output",
+        output: result.output,
+        model: result.model,
+        provider: result.provider,
+        latencyMs: result.latencyMs,
+      })
+    );
+    if (result.notice) {
+      logs.push(log(node.id, result.notice, "warn"));
+    }
+    return "ok";
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Document extract failed";
+    logs.push(log(node.id, message, "error"));
+    return { error: message };
+  }
+}
+
 /**
  * After a node completes: if multiple unlabeled outgoing edges target
  * outbound nodes (http/slack/webhook/email), run them in parallel (fan-out),
@@ -958,6 +1081,81 @@ export async function runWorkflowGraph(options: {
         );
         if (wa !== "ok") {
           return { kind: "failed", logs, error: wa.error };
+        }
+        {
+          const adv = await advanceAfterNode({
+            nodeId: node.id,
+            edges,
+            byId,
+            logs,
+            context,
+            triggerPayload,
+            dryRun,
+          });
+          if (adv.error) {
+            return { kind: "failed", logs, error: adv.error };
+          }
+          currentId = adv.nextId;
+        }
+        break;
+      }
+      case "browser_agent": {
+        const maxAttempts = (data.maxRetries ?? 1) + 1;
+        const browser = await withRetries(
+          maxAttempts,
+          async (attempt) => {
+            if (attempt > 1) {
+              logs.push(
+                log(
+                  node.id,
+                  `browser_agent retry ${attempt}/${maxAttempts}…`,
+                  "warn"
+                )
+              );
+            }
+            return runBrowserAgentNode({
+              node,
+              data,
+              logs,
+              context,
+              triggerPayload,
+              dryRun,
+            });
+          },
+          (value) => value === "ok"
+        );
+        if (browser !== "ok") {
+          return { kind: "failed", logs, error: browser.error };
+        }
+        {
+          const adv = await advanceAfterNode({
+            nodeId: node.id,
+            edges,
+            byId,
+            logs,
+            context,
+            triggerPayload,
+            dryRun,
+          });
+          if (adv.error) {
+            return { kind: "failed", logs, error: adv.error };
+          }
+          currentId = adv.nextId;
+        }
+        break;
+      }
+      case "document_extract": {
+        const extracted = await runDocumentExtractNode({
+          node,
+          data,
+          logs,
+          context,
+          triggerPayload,
+          orgId,
+          dryRun,
+        });
+        if (extracted !== "ok") {
+          return { kind: "failed", logs, error: extracted.error };
         }
         {
           const adv = await advanceAfterNode({

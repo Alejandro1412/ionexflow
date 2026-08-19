@@ -18,6 +18,12 @@ Command center B2B: diseñar y ejecutar procesos con agentes de IA + aprobacione
 | Dashboard overview | OK | Conteos + atajos |
 | AI Automations | OK | Plantillas + **Descríbelo y te lo armo** (NL→workflow inactivo) + AI Lab |
 | Knowledge | OK | `/dashboard/knowledge` — docs de texto; agentes inyectan contexto (ILIKE MVP) |
+| Monitors | OK | `/dashboard/monitors` — umbrales → dispara workflow vía cron |
+| Insights / learning | OK | Rechazos/edits → suggestion + Knowledge tag `learning` |
+| Voice inbound | OK | `/api/voice/webhook` + Integrations |
+| Browser agent node | OK | Simulate o `BROWSER_WORKER_URL` |
+| Document extract node | OK | LLM extract de `{{body}}` / plantilla |
+| Industry templates | OK | Inmobiliaria, Legal, Clínica, Restaurante |
 | WhatsApp Cloud API | OK | Integrations + webhook `/api/whatsapp/webhook` + nodo `whatsapp_send` |
 | Workflows + canvas | OK | Agent (+ Knowledge), Classifier, Approval, Delay, HTTP/Slack/Email/WhatsApp; **versions** + **Test run** |
 | Motor + LLM | OK | OpenAI/Anthropic o demo; dry-run stub side effects |

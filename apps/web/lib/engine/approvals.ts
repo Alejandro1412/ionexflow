@@ -78,6 +78,23 @@ export async function applyApprovalDecision(
     meta: { decision, source, edited: Boolean(trimmedEdit) },
   });
 
+  try {
+    const { recordApprovalLearning } = await import(
+      "@/lib/learning/from-approval"
+    );
+    await recordApprovalLearning(supabase, {
+      orgId,
+      workflowId: (execution.workflow_id as string) ?? null,
+      approvalId,
+      decision,
+      agentOutput: payload.agentOutput ?? null,
+      editedOutput: trimmedEdit,
+      agentLabel: payload.agentLabel ?? null,
+    });
+  } catch {
+    /* learning is best-effort */
+  }
+
   if (decision === "rejected") {
     const logs = [
       ...existingLogs,

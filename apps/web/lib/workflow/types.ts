@@ -14,6 +14,8 @@ export type WorkflowNodeType =
   | "email_send"
   | "email_forward"
   | "whatsapp_send"
+  | "browser_agent"
+  | "document_extract"
   | "end";
 
 export type FlowNodeData = {
@@ -56,6 +58,12 @@ export type FlowNodeData = {
   /** WhatsApp send */
   waToTemplate?: string;
   waBodyTemplate?: string;
+  /** Browser agent (legacy UIs / no API) */
+  browserUrl?: string;
+  browserStepsJson?: string;
+  /** Document extract fields hint */
+  extractFields?: string;
+  documentTemplate?: string;
 };
 
 export type FlowNode = {

@@ -46,6 +46,8 @@ const TYPE_COLORS: Record<WorkflowNodeType, string> = {
   email_send: "border-teal-400/60 bg-teal-500/10",
   email_forward: "border-orange-400/50 bg-orange-500/10",
   whatsapp_send: "border-emerald-500/50 bg-emerald-500/10",
+  browser_agent: "border-orange-500/50 bg-orange-500/10",
+  document_extract: "border-indigo-400/50 bg-indigo-500/10",
   end: "border-arc/50 bg-arc/10",
 };
 
@@ -109,6 +111,16 @@ function WorkflowNodeView({ data, selected }: NodeProps<Node<FlowNodeData>>) {
       {data.type === "whatsapp_send" ? (
         <p className="mt-1 truncate text-[10px] text-emerald-200/90">
           WA → {data.waToTemplate || data.toTemplate || "{{from}}"}
+        </p>
+      ) : null}
+      {data.type === "browser_agent" ? (
+        <p className="mt-1 truncate text-[10px] text-orange-200/90">
+          {data.browserUrl || data.url || "set URL"}
+        </p>
+      ) : null}
+      {data.type === "document_extract" ? (
+        <p className="mt-1 truncate text-[10px] text-indigo-200/90">
+          extract · {data.extractFields || "fields"}
         </p>
       ) : null}
       {data.type === "agent" && data.useOrgKnowledge !== false ? (
@@ -245,6 +257,10 @@ export function WorkflowCanvas({
                       ? "Forward / redirect"
                       : type === "whatsapp_send"
                         ? "WhatsApp message"
+                        : type === "browser_agent"
+                          ? "Browser agent"
+                          : type === "document_extract"
+                            ? "Document extract"
                       : type === "delay"
                         ? "Wait / delay"
                         : type === "start"
@@ -267,7 +283,8 @@ export function WorkflowCanvas({
             type === "webhook" ||
             type === "email_send" ||
             type === "email_forward" ||
-            type === "whatsapp_send"
+            type === "whatsapp_send" ||
+            type === "browser_agent"
               ? 2
               : undefined,
           agentMode: type === "agent" ? "general" : undefined,
@@ -275,6 +292,18 @@ export function WorkflowCanvas({
           waToTemplate: type === "whatsapp_send" ? "{{from}}" : undefined,
           waBodyTemplate:
             type === "whatsapp_send" ? "{{agentOutput}}" : undefined,
+          browserUrl:
+            type === "browser_agent" ? "https://example.com" : undefined,
+          browserStepsJson:
+            type === "browser_agent"
+              ? '[{"action":"goto"},{"action":"wait","ms":1000}]'
+              : undefined,
+          extractFields:
+            type === "document_extract"
+              ? "amount, vendor, date, invoice_number"
+              : undefined,
+          documentTemplate:
+            type === "document_extract" ? "{{body}}" : undefined,
           prompt:
             type === "agent"
               ? AGENT_MODE_META.general.defaultPrompt
@@ -473,6 +502,16 @@ export function WorkflowCanvas({
         </Button>
         <Button type="button" variant="outline" onClick={() => addNode("whatsapp_send")}>
           + WhatsApp
+        </Button>
+        <Button type="button" variant="outline" onClick={() => addNode("browser_agent")}>
+          + Browser
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => addNode("document_extract")}
+        >
+          + Extract doc
         </Button>
         <Button type="button" variant="outline" onClick={onSave} disabled={saving}>
           {saving ? "Saving…" : "Save"}
@@ -901,6 +940,64 @@ export function WorkflowCanvas({
                       onChange={(e) =>
                         updateSelectedData({ waBodyTemplate: e.target.value })
                       }
+                    />
+                  </div>
+                </>
+              ) : null}
+              {(selected.data as FlowNodeData).type === "browser_agent" ? (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <Label>Target URL</Label>
+                    <Input
+                      value={
+                        (selected.data as FlowNodeData).browserUrl ??
+                        (selected.data as FlowNodeData).url ??
+                        ""
+                      }
+                      onChange={(e) =>
+                        updateSelectedData({ browserUrl: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label>Steps JSON</Label>
+                    <textarea
+                      className="min-h-[120px] rounded-md border border-white/10 bg-black/30 p-2 font-mono text-xs"
+                      value={(selected.data as FlowNodeData).browserStepsJson ?? ""}
+                      onChange={(e) =>
+                        updateSelectedData({ browserStepsJson: e.target.value })
+                      }
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Without <code>BROWSER_WORKER_URL</code> runs in simulate mode.
+                    Dry-run always stubs.
+                  </p>
+                </>
+              ) : null}
+              {(selected.data as FlowNodeData).type === "document_extract" ? (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <Label>Document text template</Label>
+                    <textarea
+                      className="min-h-[80px] rounded-md border border-white/10 bg-black/30 p-2 text-sm"
+                      value={
+                        (selected.data as FlowNodeData).documentTemplate ??
+                        "{{body}}"
+                      }
+                      onChange={(e) =>
+                        updateSelectedData({ documentTemplate: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label>Fields to extract</Label>
+                    <Input
+                      value={(selected.data as FlowNodeData).extractFields ?? ""}
+                      onChange={(e) =>
+                        updateSelectedData({ extractFields: e.target.value })
+                      }
+                      placeholder="amount, vendor, date…"
                     />
                   </div>
                 </>

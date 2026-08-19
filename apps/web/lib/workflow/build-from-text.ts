@@ -15,6 +15,8 @@ const ALLOWED: WorkflowNodeType[] = [
   "email_send",
   "email_forward",
   "whatsapp_send",
+  "browser_agent",
+  "document_extract",
   "end",
 ];
 

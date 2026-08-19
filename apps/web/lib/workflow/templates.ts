@@ -14,7 +14,15 @@ import {
 export type AutomationTemplate = {
   id: string;
   name: string;
-  category: "Marketing" | "Support" | "Sales" | "Ops";
+  category:
+    | "Marketing"
+    | "Support"
+    | "Sales"
+    | "Ops"
+    | "RealEstate"
+    | "Legal"
+    | "Healthcare"
+    | "Hospitality";
   blurb: string;
   triggerHint: string;
   build: () => { nodes: FlowNode[]; edges: FlowEdge[] };
@@ -697,8 +705,336 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
       "Notas de reunión: migrar billing a Stripe, due viernes, owner Ana, riesgo: webhooks.",
     build: opsPlaybookGraph,
   },
+  {
+    id: "realestate-leads",
+    name: "Inmobiliaria · calificar y agendar",
+    category: "RealEstate",
+    blurb:
+      "Prospecto entrante → califica interés → approval → mensaje de agendar visita.",
+    triggerHint:
+      "Prospecto busca depa 2 recámaras en Polanco, presupuesto 8M MXN, disponible sábado.",
+    build: realEstateLeadsGraph,
+  },
+  {
+    id: "legal-contract-review",
+    name: "Legal · revisar contrato",
+    category: "Legal",
+    blurb:
+      "Extrae cláusulas → agente resalta riesgos → approval humano antes de responder.",
+    triggerHint:
+      "Pega el contrato o un extracto: cláusulas de indemnidad, exclusividad, renovación automática…",
+    build: legalContractReviewGraph,
+  },
+  {
+    id: "clinic-followup",
+    name: "Clínica · cita y seguimiento",
+    category: "Healthcare",
+    blurb: "Confirma cita → prepara follow-up post-consulta con approval.",
+    triggerHint:
+      "Paciente Ana, cita odontológica martes 10am, primera visita, WhatsApp +52…",
+    build: clinicFollowupGraph,
+  },
+  {
+    id: "restaurant-orders",
+    name: "Restaurante · pedido / queja",
+    category: "Hospitality",
+    blurb:
+      "Clasifica pedido vs queja → responde con tono de marca → approval si es sensible.",
+    triggerHint:
+      "Pedido: 2 pizzas medianas a Av. Reforma 123. O queja: llegó frío y tarde.",
+    build: restaurantOrdersGraph,
+  },
 ];
 
 export function getAutomationTemplate(id: string) {
   return AUTOMATION_TEMPLATES.find((t) => t.id === id) ?? null;
+}
+
+function realEstateLeadsGraph(): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const sales = AGENT_MODE_META.sales;
+  const nodes: FlowNode[] = [
+    {
+      id: "start-1",
+      type: "workflow",
+      position: { x: 40, y: 160 },
+      data: { label: "Start", type: "start" },
+    },
+    {
+      id: "agent-qualify",
+      type: "workflow",
+      position: { x: 260, y: 160 },
+      data: {
+        label: "Qualify prospect",
+        type: "agent",
+        agentMode: "sales",
+        useOrgKnowledge: true,
+        model: "gpt-4o-mini",
+        prompt:
+          "Califica el prospecto inmobiliario: presupuesto, zona, urgencia, fit. Propón 2 slots de visita.",
+        systemPrompt: sales.system,
+      },
+    },
+    {
+      id: "approval-1",
+      type: "workflow",
+      position: { x: 520, y: 160 },
+      data: {
+        label: "Advisor approval",
+        type: "approval",
+        message: "Revisa la calificación y el mensaje de agendar antes de enviar.",
+        slaMinutes: 240,
+      },
+    },
+    {
+      id: "wa-1",
+      type: "workflow",
+      position: { x: 760, y: 160 },
+      data: {
+        label: "WhatsApp invite",
+        type: "whatsapp_send",
+        waToTemplate: "{{from}}",
+        waBodyTemplate: "{{agentOutput}}",
+      },
+    },
+    {
+      id: "end-1",
+      type: "workflow",
+      position: { x: 1000, y: 160 },
+      data: { label: "End", type: "end" },
+    },
+  ];
+  const edges: FlowEdge[] = [
+    { id: "e1", source: "start-1", target: "agent-qualify" },
+    { id: "e2", source: "agent-qualify", target: "approval-1" },
+    { id: "e3", source: "approval-1", target: "wa-1" },
+    { id: "e4", source: "wa-1", target: "end-1" },
+  ];
+  return { nodes, edges };
+}
+
+function legalContractReviewGraph(): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const extract = AGENT_MODE_META.extract;
+  const nodes: FlowNode[] = [
+    {
+      id: "start-1",
+      type: "workflow",
+      position: { x: 40, y: 160 },
+      data: { label: "Start", type: "start" },
+    },
+    {
+      id: "doc-1",
+      type: "workflow",
+      position: { x: 240, y: 160 },
+      data: {
+        label: "Extract clauses",
+        type: "document_extract",
+        documentTemplate: "{{body}}",
+        extractFields:
+          "parties, term, termination, indemnity, liability_cap, exclusivity, auto_renewal, governing_law",
+      },
+    },
+    {
+      id: "agent-risk",
+      type: "workflow",
+      position: { x: 480, y: 160 },
+      data: {
+        label: "Risk highlight",
+        type: "agent",
+        agentMode: "extract",
+        useOrgKnowledge: true,
+        model: "gpt-4o-mini",
+        prompt:
+          "Con los campos extraídos, lista riesgos legales en lenguaje claro para el cliente. No des consejo jurídico formal; marca cláusulas a revisar con abogado.",
+        systemPrompt: extract.system,
+      },
+    },
+    {
+      id: "approval-1",
+      type: "workflow",
+      position: { x: 720, y: 160 },
+      data: {
+        label: "Lawyer approval",
+        type: "approval",
+        message: "Revisa el resumen de riesgos antes de compartirlo.",
+      },
+    },
+    {
+      id: "end-1",
+      type: "workflow",
+      position: { x: 960, y: 160 },
+      data: { label: "End", type: "end" },
+    },
+  ];
+  const edges: FlowEdge[] = [
+    { id: "e1", source: "start-1", target: "doc-1" },
+    { id: "e2", source: "doc-1", target: "agent-risk" },
+    { id: "e3", source: "agent-risk", target: "approval-1" },
+    { id: "e4", source: "approval-1", target: "end-1" },
+  ];
+  return { nodes, edges };
+}
+
+function clinicFollowupGraph(): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const support = AGENT_MODE_META.support;
+  const nodes: FlowNode[] = [
+    {
+      id: "start-1",
+      type: "workflow",
+      position: { x: 40, y: 160 },
+      data: { label: "Start", type: "start" },
+    },
+    {
+      id: "agent-1",
+      type: "workflow",
+      position: { x: 280, y: 160 },
+      data: {
+        label: "Confirm + follow-up",
+        type: "agent",
+        agentMode: "support",
+        useOrgKnowledge: true,
+        model: "gpt-4o-mini",
+        prompt:
+          "Redacta confirmación de cita y un mensaje breve de seguimiento post-consulta (cuidados, próxima visita). Tono cálido y claro.",
+        systemPrompt: support.system,
+      },
+    },
+    {
+      id: "approval-1",
+      type: "workflow",
+      position: { x: 540, y: 160 },
+      data: {
+        label: "Clinic approval",
+        type: "approval",
+        message: "Aprueba el mensaje al paciente.",
+        slaMinutes: 120,
+      },
+    },
+    {
+      id: "wa-1",
+      type: "workflow",
+      position: { x: 780, y: 160 },
+      data: {
+        label: "WhatsApp patient",
+        type: "whatsapp_send",
+        waToTemplate: "{{from}}",
+        waBodyTemplate: "{{agentOutput}}",
+      },
+    },
+    {
+      id: "end-1",
+      type: "workflow",
+      position: { x: 1020, y: 160 },
+      data: { label: "End", type: "end" },
+    },
+  ];
+  const edges: FlowEdge[] = [
+    { id: "e1", source: "start-1", target: "agent-1" },
+    { id: "e2", source: "agent-1", target: "approval-1" },
+    { id: "e3", source: "approval-1", target: "wa-1" },
+    { id: "e4", source: "wa-1", target: "end-1" },
+  ];
+  return { nodes, edges };
+}
+
+function restaurantOrdersGraph(): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const support = AGENT_MODE_META.support;
+  const nodes: FlowNode[] = [
+    {
+      id: "start-1",
+      type: "workflow",
+      position: { x: 40, y: 200 },
+      data: { label: "Start", type: "start" },
+    },
+    {
+      id: "clf-1",
+      type: "workflow",
+      position: { x: 240, y: 200 },
+      data: {
+        label: "Pedido vs queja",
+        type: "classifier",
+        routes: "order,complaint",
+        prompt:
+          "Clasifica: order (pedido/nuevo) o complaint (queja/reclamo). Responde solo la ruta.",
+      },
+    },
+    {
+      id: "agent-order",
+      type: "workflow",
+      position: { x: 480, y: 80 },
+      data: {
+        label: "Confirm order",
+        type: "agent",
+        agentMode: "support",
+        useOrgKnowledge: true,
+        model: "gpt-4o-mini",
+        prompt:
+          "Confirma el pedido con resumen claro (ítems, dirección, tiempo estimado). Usa Knowledge del menú si existe.",
+        systemPrompt: support.system,
+      },
+    },
+    {
+      id: "agent-complaint",
+      type: "workflow",
+      position: { x: 480, y: 300 },
+      data: {
+        label: "Handle complaint",
+        type: "agent",
+        agentMode: "support",
+        useOrgKnowledge: true,
+        model: "gpt-4o-mini",
+        prompt:
+          "Responde con empatía, ofrece solución concreta (reenvío/descuento/escalar). No inventes políticas.",
+        systemPrompt: support.system,
+      },
+    },
+    {
+      id: "approval-1",
+      type: "workflow",
+      position: { x: 720, y: 300 },
+      data: {
+        label: "Manager approval",
+        type: "approval",
+        message: "Queja sensible — aprueba antes de enviar.",
+      },
+    },
+    {
+      id: "wa-1",
+      type: "workflow",
+      position: { x: 960, y: 200 },
+      data: {
+        label: "WhatsApp reply",
+        type: "whatsapp_send",
+        waToTemplate: "{{from}}",
+        waBodyTemplate: "{{agentOutput}}",
+      },
+    },
+    {
+      id: "end-1",
+      type: "workflow",
+      position: { x: 1200, y: 200 },
+      data: { label: "End", type: "end" },
+    },
+  ];
+  const edges: FlowEdge[] = [
+    { id: "e1", source: "start-1", target: "clf-1" },
+    {
+      id: "e2",
+      source: "clf-1",
+      target: "agent-order",
+      sourceHandle: "order",
+      label: "order",
+    },
+    {
+      id: "e3",
+      source: "clf-1",
+      target: "agent-complaint",
+      sourceHandle: "complaint",
+      label: "complaint",
+    },
+    { id: "e4", source: "agent-order", target: "wa-1" },
+    { id: "e5", source: "agent-complaint", target: "approval-1" },
+    { id: "e6", source: "approval-1", target: "wa-1" },
+    { id: "e7", source: "wa-1", target: "end-1" },
+  ];
+  return { nodes, edges };
 }
