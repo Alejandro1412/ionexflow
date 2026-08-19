@@ -5,9 +5,14 @@ import { usePathname } from "next/navigation";
 
 const NAV = [
   { href: "/dashboard", label: "Overview" },
+  { href: "/dashboard/automations", label: "AI Automations" },
+  { href: "/dashboard/integrations", label: "Integrations" },
+  { href: "/dashboard/assistant", label: "Assistant" },
   { href: "/dashboard/workflows", label: "Workflows" },
   { href: "/dashboard/executions", label: "Executions" },
   { href: "/dashboard/approvals", label: "Approvals" },
+  { href: "/dashboard/notifications", label: "Notifications" },
+  { href: "/dashboard/team", label: "Team" },
   { href: "/dashboard/billing", label: "Billing" },
 ] as const;
 
@@ -27,6 +32,7 @@ export function DashboardNav() {
           <Link
             key={item.href}
             href={item.href}
+            prefetch={false}
             className={
               active
                 ? "rounded-md bg-white/10 px-3 py-1.5 text-sm text-signal"

@@ -34,7 +34,7 @@ export default async function DashboardPage() {
           Welcome{session?.profile.full_name ? `, ${session.profile.full_name}` : ""}
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Design agent workflows, run them, and approve human gates from web or mobile.
+          Automate processes with AI agents, classifiers, and human approvals.
         </p>
       </div>
 
@@ -95,6 +95,9 @@ export default async function DashboardPage() {
 
       <div className="flex flex-wrap gap-3">
         <Button asChild>
+          <Link href="/dashboard/automations">AI Automations</Link>
+        </Button>
+        <Button asChild variant="outline">
           <Link href="/dashboard/workflows">Open workflows</Link>
         </Button>
         <Button asChild variant="outline">

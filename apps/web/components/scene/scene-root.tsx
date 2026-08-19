@@ -6,7 +6,7 @@ import { modeFromPathname } from "@/components/scene/types";
 
 const SceneShell = dynamic(
   () => import("@/components/scene/scene-shell").then((mod) => mod.SceneShell),
-  { ssr: false }
+  { ssr: false, loading: () => null }
 );
 
 /**

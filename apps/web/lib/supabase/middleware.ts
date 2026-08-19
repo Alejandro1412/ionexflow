@@ -1,7 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/pricing", "/auth", "/api/stripe", "/api/approvals"];
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/signup",
+  "/pricing",
+  "/auth",
+  "/api/stripe",
+  "/api/approvals",
+];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(
@@ -9,10 +17,15 @@ function isPublicPath(pathname: string) {
   );
 }
 
+/** Only real Supabase session cookies — avoid forcing getUser() on every request. */
 function hasAuthCookie(request: NextRequest) {
   return request.cookies
     .getAll()
-    .some((cookie) => cookie.name.includes("auth-token") || cookie.name.startsWith("sb-"));
+    .some(
+      (cookie) =>
+        cookie.name.includes("-auth-token") ||
+        cookie.name.endsWith("auth-token.code-verifier")
+    );
 }
 
 /**
@@ -23,7 +36,6 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const publicPath = isPublicPath(pathname);
 
-  // Fast path: marketing/API public routes with no session cookies.
   if (publicPath && !hasAuthCookie(request)) {
     return NextResponse.next({ request });
   }

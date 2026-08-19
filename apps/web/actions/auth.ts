@@ -11,9 +11,10 @@ export type AuthActionState = {
 
 const signUpSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
-  orgName: z.string().min(1, "Organization name is required"),
+  orgName: z.string().optional(),
   email: z.string().email("Enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  inviteToken: z.string().optional(),
 });
 
 const signInSchema = z.object({
@@ -22,20 +23,21 @@ const signInSchema = z.object({
 });
 
 /**
- * Creates the auth.users row. Org + profile provisioning happens
- * server-side via the `handle_new_user` trigger (see the Phase 1
- * migration) — this action never writes to `organizations` or
- * `profiles` directly.
+ * Creates the auth.users row. Org + profile provisioning happens via
+ * `handle_new_user`. Pass invite_token in metadata to join an existing org.
  */
 export async function signUp(
   _prevState: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
+  const inviteToken =
+    String(formData.get("inviteToken") ?? "").trim() || undefined;
   const parsed = signUpSchema.safeParse({
     fullName: formData.get("fullName"),
-    orgName: formData.get("orgName"),
+    orgName: formData.get("orgName") || undefined,
     email: formData.get("email"),
     password: formData.get("password"),
+    inviteToken,
   });
 
   if (!parsed.success) {
@@ -43,6 +45,10 @@ export async function signUp(
   }
 
   const { fullName, orgName, email, password } = parsed.data;
+  if (!inviteToken && !orgName?.trim()) {
+    return { error: "Organization name is required" };
+  }
+
   const supabase = await createClient();
   const origin = (await headers()).get("origin");
 
@@ -51,7 +57,12 @@ export async function signUp(
     password,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
-      data: { full_name: fullName, org_name: orgName },
+      data: {
+        full_name: fullName,
+        ...(inviteToken
+          ? { invite_token: inviteToken }
+          : { org_name: orgName!.trim() }),
+      },
     },
   });
 

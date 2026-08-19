@@ -22,6 +22,9 @@ type Props = {
   initialNodes: FlowNode[];
   initialEdges: FlowEdge[];
   initialActive: boolean;
+  initialScheduleEnabled?: boolean;
+  initialScheduleEveryMinutes?: number | null;
+  aiStatus?: { live: boolean; label: string; hint: string };
 };
 
 export function WorkflowCanvasLazy(props: Props) {

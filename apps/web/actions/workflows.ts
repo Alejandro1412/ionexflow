@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/org";
 import { hasProductAccess } from "@/lib/billing";
 import { defaultWorkflowGraph } from "@/lib/workflow/types";
+import { getAutomationTemplate } from "@/lib/workflow/templates";
 import type { FlowEdge, FlowNode } from "@/lib/workflow/types";
 
 export type WorkflowActionState = { error?: string } | null;
@@ -27,7 +28,9 @@ export async function createWorkflow() {
   if ("error" in access && access.error === "upgrade_required") {
     redirect("/dashboard/billing?paywall=1");
   }
-  const { session } = access as { session: NonNullable<Awaited<ReturnType<typeof getSessionProfile>>> };
+  const { session } = access as {
+    session: NonNullable<Awaited<ReturnType<typeof getSessionProfile>>>;
+  };
   const graph = defaultWorkflowGraph();
   const supabase = await createClient();
 
@@ -51,9 +54,53 @@ export async function createWorkflow() {
   redirect(`/dashboard/workflows/${data.id}`);
 }
 
+export async function createWorkflowFromTemplate(templateId: string) {
+  const access = await requireAccess();
+  if ("error" in access && access.error === "Not authenticated") {
+    redirect("/login");
+  }
+  if ("error" in access && access.error === "upgrade_required") {
+    redirect("/dashboard/billing?paywall=1");
+  }
+  const { session } = access as {
+    session: NonNullable<Awaited<ReturnType<typeof getSessionProfile>>>;
+  };
+
+  const template = getAutomationTemplate(templateId);
+  if (!template) throw new Error("Unknown template");
+
+  const graph = template.build();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("workflows")
+    .insert({
+      org_id: session.org!.id,
+      name: template.name,
+      nodes: graph.nodes,
+      edges: graph.edges,
+      is_active: true,
+      created_by: session.profile.id,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to create from template");
+  }
+
+  redirect(`/dashboard/workflows/${data.id}`);
+}
+
 export async function saveWorkflow(
   workflowId: string,
-  input: { name: string; nodes: FlowNode[]; edges: FlowEdge[]; is_active: boolean }
+  input: {
+    name: string;
+    nodes: FlowNode[];
+    edges: FlowEdge[];
+    is_active: boolean;
+    schedule_enabled?: boolean;
+    schedule_every_minutes?: number | null;
+  }
 ): Promise<WorkflowActionState> {
   const access = await requireAccess();
   if ("error" in access) {
@@ -73,12 +120,17 @@ export async function saveWorkflow(
       nodes: input.nodes,
       edges: input.edges,
       is_active: input.is_active,
+      schedule_enabled: Boolean(input.schedule_enabled),
+      schedule_every_minutes: input.schedule_enabled
+        ? input.schedule_every_minutes ?? 60
+        : null,
     })
     .eq("id", workflowId);
 
   if (error) return { error: error.message };
   revalidatePath(`/dashboard/workflows/${workflowId}`);
   revalidatePath("/dashboard/workflows");
+  revalidatePath("/dashboard/automations");
   return null;
 }
 
@@ -89,5 +141,6 @@ export async function deleteWorkflow(workflowId: string) {
   const supabase = await createClient();
   await supabase.from("workflows").delete().eq("id", workflowId);
   revalidatePath("/dashboard/workflows");
+  revalidatePath("/dashboard/automations");
   redirect("/dashboard/workflows");
 }

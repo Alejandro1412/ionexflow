@@ -9,13 +9,7 @@ export function isGoogleAuthEnabled() {
 
 export function GoogleButton() {
   if (!isGoogleAuthEnabled()) {
-    return (
-      <p className="text-center text-xs text-muted-foreground">
-        Google sign-in is disabled until you set{" "}
-        <code className="text-signal">NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true</code> and
-        configure <code className="text-signal">GOOGLE_OAUTH_*</code> for Supabase.
-      </p>
-    );
+    return null;
   }
 
   return (

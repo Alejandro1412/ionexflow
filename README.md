@@ -1,77 +1,60 @@
 # IonexFlow
 
-B2B SaaS for building, orchestrating, and monitoring autonomous AI agent
-workflows visually — with human-in-the-loop approvals and Stripe billing.
+B2B command center for designing, running, and supervising AI agent workflows
+with human-in-the-loop approvals, automation templates, email IMAP/SMTP, and
+an in-app guide (Ionex Assistant).
 
-> **Status: Phases 1–5 implemented** — auth, billing, React Flow canvas,
-> execution engine, and mobile Realtime approval inbox.
+> **Status:** Core product usable locally + production deploy/billing path documented.  
+> **Next for enterprise:** team invites/roles UI, background email sync, Expo push.
 
 ## Stack
 
 | Layer | Choice |
 | --- | --- |
-| Monorepo | Turborepo + pnpm workspaces |
-| Web | Next.js 14, TypeScript, Tailwind, React Flow, Three.js |
+| Monorepo | Turborepo + pnpm |
+| Web | Next.js 14, TypeScript, Tailwind, React Flow |
 | Mobile | Expo Router + Supabase Auth + Realtime |
 | Database | Supabase (PostgreSQL + RLS) |
-| Billing | Stripe Checkout + webhooks (+ local Activate Pro bypass) |
-| Engine | In-process graph runner (start → agent → approval → end) |
+| AI | OpenAI / Anthropic (+ demo fallback) |
+| Billing | Stripe Checkout + portal (Activate Pro only in local/dev) |
 
-## Repo layout
+## Docs (start here)
 
-```
-apps/
-  web/        Command Center (landing, auth, canvas, billing, logs)
-  mobile/     Companion app (login + Realtime approvals)
-packages/
-  config/     Shared tsconfig + eslint
-  ui/         Shared UI package (placeholder)
-supabase/     Migrations, local config, seed
-docs/         Product guide + design specs
-```
+| Doc | Content |
+| --- | --- |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | **Ship to Vercel + Supabase Cloud + Stripe** |
+| [`docs/GUIA-DE-LA-APP.md`](docs/GUIA-DE-LA-APP.md) | Full Spanish product guide |
+| [`docs/ESTADO-FUNCIONAL.md`](docs/ESTADO-FUNCIONAL.md) | Feature matrix + external config |
+| [`docs/PLAN-SIGUIENTE.md`](docs/PLAN-SIGUIENTE.md) | Roadmap |
 
 ## Getting started
-
-Requires Node 20+, pnpm 9+, Docker, and Supabase CLI (`npx supabase` works).
 
 ```bash
 pnpm install
 npx supabase start
-# copy URL + anon + service_role keys into apps/web/.env.local
-# (see apps/web/.env.example)
-
+# copy keys → apps/web/.env.local (see apps/web/.env.example)
+# optional: OPENAI_API_KEY=...
 pnpm dev:web
 ```
 
-Optional mobile:
+Open http://localhost:3000 → signup → **AI Automations** → run a template → **Approvals**.
 
-```bash
-cp apps/mobile/.env.example apps/mobile/.env
-# set EXPO_PUBLIC_* to the same local Supabase keys
-# EXPO_PUBLIC_API_URL=http://localhost:3000  (use your LAN IP on a physical device)
-pnpm dev:mobile
+## What you can do today
+
+1. Sign up (org + owner)
+2. Start from automation templates or build on the canvas
+3. Run LLM agents + classifiers + human approvals
+4. Connect real IMAP/SMTP email (Support inbox playbook)
+5. HTTP / Slack / Webhook nodes
+6. In-app notifications (+ optional Resend)
+7. Stripe Checkout (production-ready code; configure keys per DEPLOY.md)
+8. Ionex Assistant
+
+## Repo layout
+
 ```
-
-### Stripe (optional for local)
-
-Set `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, and
-`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. Forward webhooks to
-`/api/stripe/webhook`.
-
-Without Stripe keys, owners can use **Activate Pro (dev)** on
-`/dashboard/billing`. Trial already has product access.
-
-## What you can do
-
-1. Sign up → org + owner profile (DB trigger)
-2. Create / edit workflows on a React Flow canvas
-3. Run workflows → agent simulation logs → pause on Approval nodes
-4. Approve / reject from web or mobile (engine resumes)
-5. Upgrade via Stripe or local Activate Pro
-
-See `docs/GUIA-DE-LA-APP.md` for a Spanish walkthrough.
-
-## Database
-
-Tables: `organizations`, `profiles`, `workflows`, `workflow_executions`,
-`approvals` — all RLS-scoped by `current_org_id()`.
+apps/web/      Command center (+ vercel.json)
+apps/mobile/   Approvals companion
+supabase/      Migrations + local config
+docs/          Product + deploy documentation
+```

@@ -7,6 +7,15 @@ export type ExecutionStatus =
   | "paused"
   | "completed"
   | "failed";
+export type NotificationType = "approval_pending" | "system";
+export type EmailProvider = "gmail" | "outlook" | "resend_inbound" | "imap";
+export type EmailConnectionStatus =
+  | "disconnected"
+  | "demo_connected"
+  | "pending_oauth"
+  | "active"
+  | "error";
+export type EmailDirection = "inbound" | "outbound" | "forward";
 
 export type Json =
   | string
@@ -92,6 +101,9 @@ export interface Database {
           nodes: Json;
           edges: Json;
           is_active: boolean;
+          schedule_enabled: boolean;
+          schedule_every_minutes: number | null;
+          last_scheduled_at: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -103,6 +115,9 @@ export interface Database {
           nodes?: Json;
           edges?: Json;
           is_active?: boolean;
+          schedule_enabled?: boolean;
+          schedule_every_minutes?: number | null;
+          last_scheduled_at?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -114,6 +129,9 @@ export interface Database {
           nodes?: Json;
           edges?: Json;
           is_active?: boolean;
+          schedule_enabled?: boolean;
+          schedule_every_minutes?: number | null;
+          last_scheduled_at?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -139,6 +157,8 @@ export interface Database {
           started_at: string | null;
           completed_at: string | null;
           created_at: string;
+          resume_at: string | null;
+          waiting_node_id: string | null;
         };
         Insert: {
           id?: string;
@@ -150,6 +170,8 @@ export interface Database {
           started_at?: string | null;
           completed_at?: string | null;
           created_at?: string;
+          resume_at?: string | null;
+          waiting_node_id?: string | null;
         };
         Update: {
           id?: string;
@@ -161,6 +183,8 @@ export interface Database {
           started_at?: string | null;
           completed_at?: string | null;
           created_at?: string;
+          resume_at?: string | null;
+          waiting_node_id?: string | null;
         };
         Relationships: [
           {
@@ -168,6 +192,50 @@ export interface Database {
             columns: ["workflow_id"];
             isOneToOne: false;
             referencedRelation: "workflows";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      invites: {
+        Row: {
+          id: string;
+          org_id: string;
+          email: string;
+          role: UserRole;
+          token: string;
+          invited_by: string | null;
+          expires_at: string;
+          accepted_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          email: string;
+          role?: UserRole;
+          token: string;
+          invited_by?: string | null;
+          expires_at: string;
+          accepted_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          email?: string;
+          role?: UserRole;
+          token?: string;
+          invited_by?: string | null;
+          expires_at?: string;
+          accepted_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invites_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
             referencedColumns: ["id"];
           },
         ];
@@ -219,6 +287,182 @@ export interface Database {
           },
         ];
       };
+      notifications: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string;
+          type: NotificationType;
+          title: string;
+          body: string;
+          href: string | null;
+          meta: Json;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          user_id: string;
+          type?: NotificationType;
+          title: string;
+          body?: string;
+          href?: string | null;
+          meta?: Json;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          user_id?: string;
+          type?: NotificationType;
+          title?: string;
+          body?: string;
+          href?: string | null;
+          meta?: Json;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      email_connections: {
+        Row: {
+          id: string;
+          org_id: string;
+          provider: EmailProvider;
+          status: EmailConnectionStatus;
+          display_name: string;
+          email_address: string | null;
+          inbound_token: string;
+          default_workflow_id: string | null;
+          forward_to: string | null;
+          meta: Json;
+          last_error: string | null;
+          connected_at: string | null;
+          created_at: string;
+          updated_at: string;
+          username: string | null;
+          password: string | null;
+          imap_host: string | null;
+          imap_port: number | null;
+          imap_secure: boolean;
+          smtp_host: string | null;
+          smtp_port: number | null;
+          smtp_secure: boolean;
+          last_synced_at: string | null;
+          auto_sync: boolean;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          provider: EmailProvider;
+          status?: EmailConnectionStatus;
+          display_name?: string;
+          email_address?: string | null;
+          inbound_token?: string;
+          default_workflow_id?: string | null;
+          forward_to?: string | null;
+          meta?: Json;
+          last_error?: string | null;
+          connected_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          username?: string | null;
+          password?: string | null;
+          imap_host?: string | null;
+          imap_port?: number | null;
+          imap_secure?: boolean;
+          smtp_host?: string | null;
+          smtp_port?: number | null;
+          smtp_secure?: boolean;
+          last_synced_at?: string | null;
+          auto_sync?: boolean;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          provider?: EmailProvider;
+          status?: EmailConnectionStatus;
+          display_name?: string;
+          email_address?: string | null;
+          inbound_token?: string;
+          default_workflow_id?: string | null;
+          forward_to?: string | null;
+          meta?: Json;
+          last_error?: string | null;
+          connected_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          username?: string | null;
+          password?: string | null;
+          imap_host?: string | null;
+          imap_port?: number | null;
+          imap_secure?: boolean;
+          smtp_host?: string | null;
+          smtp_port?: number | null;
+          smtp_secure?: boolean;
+          last_synced_at?: string | null;
+          auto_sync?: boolean;
+        };
+        Relationships: [];
+      };
+      email_messages: {
+        Row: {
+          id: string;
+          org_id: string;
+          connection_id: string | null;
+          execution_id: string | null;
+          direction: EmailDirection;
+          from_address: string | null;
+          to_address: string | null;
+          subject: string | null;
+          body_text: string | null;
+          thread_id: string | null;
+          status: string;
+          meta: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          connection_id?: string | null;
+          execution_id?: string | null;
+          direction: EmailDirection;
+          from_address?: string | null;
+          to_address?: string | null;
+          subject?: string | null;
+          body_text?: string | null;
+          thread_id?: string | null;
+          status?: string;
+          meta?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          connection_id?: string | null;
+          execution_id?: string | null;
+          direction?: EmailDirection;
+          from_address?: string | null;
+          to_address?: string | null;
+          subject?: string | null;
+          body_text?: string | null;
+          thread_id?: string | null;
+          status?: string;
+          meta?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -230,6 +474,10 @@ export interface Database {
       user_role: UserRole;
       approval_status: ApprovalStatus;
       execution_status: ExecutionStatus;
+      notification_type: NotificationType;
+      email_provider: EmailProvider;
+      email_connection_status: EmailConnectionStatus;
+      email_direction: EmailDirection;
     };
     CompositeTypes: Record<string, never>;
   };

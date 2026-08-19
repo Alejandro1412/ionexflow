@@ -13,7 +13,9 @@ build/
 .env
 .env.local
 .env.*.local
+.env.vercel.production
 !.env.example
+!.env.vercel.production.example
 
 # Supabase
 supabase/.branches

@@ -2,22 +2,37 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/org";
 import { getStripe } from "@/lib/stripe";
-import { isStripeConfigured } from "@/lib/billing";
+import {
+  isDevBillingBypassAllowed,
+  isStripeConfigured,
+} from "@/lib/billing";
+
+function siteOrigin(headerOrigin: string | null) {
+  return (
+    headerOrigin ||
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+    "http://localhost:3000"
+  );
+}
 
 export async function createCheckoutSession() {
   const session = await getSessionProfile();
   if (!session?.org) throw new Error("Not authenticated");
+  if (session.profile.role !== "owner") {
+    throw new Error("Only owners can manage billing");
+  }
   if (!isStripeConfigured()) {
     throw new Error(
-      "Stripe is not configured. Use Activate Pro (dev) on the billing page, or set STRIPE_* env vars."
+      "Stripe is not configured. Set STRIPE_SECRET_KEY, STRIPE_PRICE_ID, and NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY."
     );
   }
 
   const stripe = getStripe();
-  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL!;
+  const origin = siteOrigin((await headers()).get("origin"));
   const supabase = await createClient();
 
   let customerId = session.org.stripe_customer_id;
@@ -37,11 +52,16 @@ export async function createCheckoutSession() {
   const checkout = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
+    client_reference_id: session.org.id,
     line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
-    success_url: `${origin}/dashboard/billing?checkout=success`,
+    success_url: `${origin}/dashboard/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/dashboard/billing?checkout=cancel`,
+    allow_promotion_codes: true,
+    billing_address_collection: "auto",
     metadata: { org_id: session.org.id },
-    subscription_data: { metadata: { org_id: session.org.id } },
+    subscription_data: {
+      metadata: { org_id: session.org.id },
+    },
   });
 
   if (!checkout.url) throw new Error("Could not create Checkout session");
@@ -53,10 +73,13 @@ export async function createBillingPortalSession() {
   if (!session?.org?.stripe_customer_id) {
     throw new Error("No Stripe customer on this organization yet");
   }
+  if (session.profile.role !== "owner") {
+    throw new Error("Only owners can manage billing");
+  }
   if (!isStripeConfigured()) throw new Error("Stripe is not configured");
 
   const stripe = getStripe();
-  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL!;
+  const origin = siteOrigin((await headers()).get("origin"));
   const portal = await stripe.billingPortal.sessions.create({
     customer: session.org.stripe_customer_id,
     return_url: `${origin}/dashboard/billing`,
@@ -64,10 +87,59 @@ export async function createBillingPortalSession() {
   redirect(portal.url);
 }
 
-/** Local/dev path when Stripe keys are missing — marks org as active. */
+/**
+ * After Checkout success, sync plan from Stripe session even if webhook is delayed.
+ */
+export async function syncCheckoutSession(checkoutSessionId: string) {
+  const session = await getSessionProfile();
+  if (!session?.org) throw new Error("Not authenticated");
+  if (!isStripeConfigured()) throw new Error("Stripe is not configured");
+  if (!checkoutSessionId.startsWith("cs_")) {
+    throw new Error("Invalid checkout session id");
+  }
+
+  const stripe = getStripe();
+  const checkout = await stripe.checkout.sessions.retrieve(checkoutSessionId);
+
+  const orgId = checkout.metadata?.org_id || checkout.client_reference_id;
+  if (!orgId || orgId !== session.org.id) {
+    throw new Error("Checkout session does not belong to this organization");
+  }
+
+  if (checkout.status !== "complete") {
+    return { synced: false as const, reason: "not_complete" };
+  }
+
+  const admin = createServiceRoleClient();
+  const subscriptionId =
+    typeof checkout.subscription === "string"
+      ? checkout.subscription
+      : checkout.subscription?.id ?? null;
+  const customerId =
+    typeof checkout.customer === "string"
+      ? checkout.customer
+      : checkout.customer?.id ?? null;
+
+  await admin
+    .from("organizations")
+    .update({
+      plan_status: "active",
+      stripe_customer_id: customerId,
+      stripe_subscription_id: subscriptionId,
+    })
+    .eq("id", session.org.id);
+
+  revalidatePath("/dashboard/billing");
+  revalidatePath("/dashboard");
+  return { synced: true as const };
+}
+
+/** Local-only path when Stripe keys are missing — blocked in production. */
 export async function activateProDev() {
-  if (isStripeConfigured() && process.env.ALLOW_DEV_BILLING_BYPASS !== "true") {
-    throw new Error("Dev bypass disabled while Stripe is configured");
+  if (!isDevBillingBypassAllowed()) {
+    throw new Error(
+      "Activate Pro (dev) is disabled in production and when Stripe is configured without ALLOW_DEV_BILLING_BYPASS."
+    );
   }
 
   const session = await getSessionProfile();

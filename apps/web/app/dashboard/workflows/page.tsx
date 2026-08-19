@@ -29,7 +29,9 @@ export default async function WorkflowsPage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold glow-text">Workflows</h1>
-          <p className="text-muted-foreground">Visual agent graphs for your organization.</p>
+          <p className="text-muted-foreground">
+            Visual agent graphs — Research → Draft → Approval with live LLM (or demo intelligence).
+          </p>
         </div>
         <form action={createWorkflow}>
           <Button type="submit">New workflow</Button>
@@ -42,7 +44,7 @@ export default async function WorkflowsPage() {
             <CardHeader>
               <CardTitle>No workflows yet</CardTitle>
               <CardDescription>
-                Create one to get a Start → Agent → Approval → End template.
+                Create one to get Research → Draft copy → Director approval → End.
               </CardDescription>
             </CardHeader>
           </Card>

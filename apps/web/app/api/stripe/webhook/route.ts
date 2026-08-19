@@ -47,8 +47,9 @@ export async function POST(request: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        const orgId = session.metadata?.org_id;
-        if (orgId && session.subscription) {
+        const orgId =
+          session.metadata?.org_id || session.client_reference_id || null;
+        if (orgId && session.mode === "subscription") {
           await admin
             .from("organizations")
             .update({
@@ -61,6 +62,18 @@ export async function POST(request: Request) {
                   : null,
             })
             .eq("id", orgId);
+        }
+        break;
+      }
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId =
+          typeof invoice.customer === "string" ? invoice.customer : null;
+        if (customerId) {
+          await admin
+            .from("organizations")
+            .update({ plan_status: "active" })
+            .eq("stripe_customer_id", customerId);
         }
         break;
       }

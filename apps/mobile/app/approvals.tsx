@@ -17,7 +17,14 @@ type ApprovalRow = {
   node_id: string;
   execution_id: string;
   created_at: string;
-  payload: { label?: string; message?: string } | null;
+  payload: {
+    label?: string;
+    message?: string;
+    agentOutput?: string | null;
+    agentLabel?: string | null;
+    provider?: string | null;
+    model?: string | null;
+  } | null;
 };
 
 const API_BASE =
@@ -150,6 +157,36 @@ export default function ApprovalsScreen() {
               <Text style={{ color: "#9fb0c9" }}>
                 {item.payload?.message ?? "Approval required"}
               </Text>
+              {item.payload?.agentOutput ? (
+                <View
+                  style={{
+                    marginTop: 4,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: "rgba(61,255,242,0.35)",
+                    backgroundColor: "rgba(61,255,242,0.08)",
+                    padding: 12,
+                    gap: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#3DFFF2",
+                      fontSize: 11,
+                      fontWeight: "700",
+                      letterSpacing: 1,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {item.payload.agentLabel ?? "Agent output"}
+                    {item.payload.provider ? ` · ${item.payload.provider}` : ""}
+                  </Text>
+                  <Text style={{ color: "#E8F1FF", fontSize: 13, lineHeight: 18 }}>
+                    {item.payload.agentOutput.slice(0, 900)}
+                    {item.payload.agentOutput.length > 900 ? "…" : ""}
+                  </Text>
+                </View>
+              ) : null}
               <Text style={{ color: "#6b7c94", fontSize: 12 }}>
                 {new Date(item.created_at).toLocaleString()}
               </Text>

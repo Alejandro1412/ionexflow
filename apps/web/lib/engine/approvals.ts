@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { runWorkflowGraph } from "@/lib/engine/runner";
+import { persistRunnerResult } from "@/lib/engine/persist-result";
 import type { ExecutionLogEntry, FlowEdge, FlowNode } from "@/lib/workflow/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -65,12 +66,14 @@ export async function applyApprovalDecision(
         status: "failed",
         logs,
         completed_at: new Date().toISOString(),
+        resume_at: null,
+        waiting_node_id: null,
       })
       .eq("id", execution.id);
     return { executionId: execution.id as string };
   }
 
-  const result = runWorkflowGraph({
+  const result = await runWorkflowGraph({
     nodes,
     edges,
     fromNodeId: approval.node_id as string,
@@ -87,38 +90,12 @@ export async function applyApprovalDecision(
     ],
   });
 
-  if (result.kind === "paused") {
-    await supabase
-      .from("workflow_executions")
-      .update({ status: "paused", logs: result.logs })
-      .eq("id", execution.id);
-    await supabase.from("approvals").insert({
-      execution_id: execution.id,
-      org_id: orgId,
-      node_id: result.approvalNodeId,
-      status: "pending",
-      requested_by: reviewerId,
-      payload: result.approvalPayload,
-    });
-  } else if (result.kind === "completed") {
-    await supabase
-      .from("workflow_executions")
-      .update({
-        status: "completed",
-        logs: result.logs,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", execution.id);
-  } else {
-    await supabase
-      .from("workflow_executions")
-      .update({
-        status: "failed",
-        logs: result.logs,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", execution.id);
-  }
+  await persistRunnerResult(supabase, {
+    executionId: execution.id as string,
+    orgId,
+    result,
+    requestedBy: reviewerId,
+  });
 
   return { executionId: execution.id as string };
 }
