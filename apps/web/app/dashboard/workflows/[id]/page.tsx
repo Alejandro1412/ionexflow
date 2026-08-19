@@ -24,6 +24,13 @@ export default async function WorkflowEditorPage({
 
   if (!workflow) notFound();
 
+  const { data: versions } = await supabase
+    .from("workflow_versions")
+    .select("id, version, name, created_at")
+    .eq("workflow_id", workflow.id)
+    .order("version", { ascending: false })
+    .limit(20);
+
   const ai = getAiRuntimeStatus();
 
   return (
@@ -40,6 +47,7 @@ export default async function WorkflowEditorPage({
         (workflow as { schedule_every_minutes?: number | null })
           .schedule_every_minutes ?? 60
       }
+      initialVersions={versions ?? []}
       aiStatus={{ live: ai.live, label: ai.label, hint: ai.hint }}
     />
   );

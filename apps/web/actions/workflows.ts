@@ -113,6 +113,17 @@ export async function saveWorkflow(
   }
 
   const supabase = await createClient();
+  const orgId = access.session.org!.id;
+
+  const { data: current } = await supabase
+    .from("workflows")
+    .select("id, org_id")
+    .eq("id", workflowId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  if (!current) return { error: "Workflow not found" };
+
   const { error } = await supabase
     .from("workflows")
     .update({
@@ -128,10 +139,100 @@ export async function saveWorkflow(
     .eq("id", workflowId);
 
   if (error) return { error: error.message };
+
+  // Snapshot version history (best-effort; do not fail Save)
+  try {
+    const { data: latest } = await supabase
+      .from("workflow_versions")
+      .select("version")
+      .eq("workflow_id", workflowId)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const nextVersion = (latest?.version ?? 0) + 1;
+    await supabase.from("workflow_versions").insert({
+      workflow_id: workflowId,
+      org_id: orgId,
+      version: nextVersion,
+      name: input.name,
+      nodes: input.nodes,
+      edges: input.edges,
+      is_active: input.is_active,
+      schedule_enabled: Boolean(input.schedule_enabled),
+      schedule_every_minutes: input.schedule_enabled
+        ? input.schedule_every_minutes ?? 60
+        : null,
+      created_by: access.session.profile.id,
+    });
+
+    // Keep last 50 versions
+    if (nextVersion > 50) {
+      await supabase
+        .from("workflow_versions")
+        .delete()
+        .eq("workflow_id", workflowId)
+        .lt("version", nextVersion - 49);
+    }
+  } catch {
+    // table may not exist yet on older envs
+  }
+
   revalidatePath(`/dashboard/workflows/${workflowId}`);
   revalidatePath("/dashboard/workflows");
   revalidatePath("/dashboard/automations");
   return null;
+}
+
+export async function listWorkflowVersions(workflowId: string) {
+  const access = await requireAccess();
+  if ("error" in access) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("workflow_versions")
+    .select("id, version, name, created_at, created_by, is_active")
+    .eq("workflow_id", workflowId)
+    .eq("org_id", access.session.org!.id)
+    .order("version", { ascending: false })
+    .limit(20);
+
+  return data ?? [];
+}
+
+export async function restoreWorkflowVersion(
+  workflowId: string,
+  versionId: string
+): Promise<WorkflowActionState> {
+  const access = await requireAccess();
+  if ("error" in access) {
+    return {
+      error:
+        access.error === "upgrade_required"
+          ? "Upgrade required"
+          : "Not authenticated",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: version } = await supabase
+    .from("workflow_versions")
+    .select("*")
+    .eq("id", versionId)
+    .eq("workflow_id", workflowId)
+    .eq("org_id", access.session.org!.id)
+    .maybeSingle();
+
+  if (!version) return { error: "Version not found" };
+
+  return saveWorkflow(workflowId, {
+    name: version.name,
+    nodes: version.nodes as FlowNode[],
+    edges: version.edges as FlowEdge[],
+    is_active: version.is_active,
+    schedule_enabled: version.schedule_enabled,
+    schedule_every_minutes: version.schedule_every_minutes,
+  });
 }
 
 export async function deleteWorkflow(workflowId: string) {

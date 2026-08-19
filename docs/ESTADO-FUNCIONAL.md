@@ -1,8 +1,8 @@
 # Estado funcional
 
-Última alineación con el código (auth, canvas, LLM, automations, assistant, móvil, billing stub).  
-Smoke: `node scripts/smoke-e2e.mjs`  
-Guía larga: [GUIA-DE-LA-APP.md](./GUIA-DE-LA-APP.md) · Manual paso a paso: [MANUAL-COMPLETO.md](./MANUAL-COMPLETO.md)
+Última alineación con el código (hardening: cron claim, cifrado email, Test run, versions, Vitest).  
+Smoke: `pnpm --filter web test` · `node scripts/smoke-e2e.mjs`  
+Guía larga: [GUIA-DE-LA-APP.md](./GUIA-DE-LA-APP.md) · Manual paso a paso: [MANUAL-COMPLETO.md](./MANUAL-COMPLETO.md) · Deploy: [DEPLOY.md](./DEPLOY.md)
 
 ## Para qué es
 
@@ -17,9 +17,12 @@ Command center B2B: diseñar y ejecutar procesos con agentes de IA + aprobacione
 | Google OAuth | OK* | Requiere claves + redirect Supabase |
 | Dashboard overview | OK | Conteos + atajos |
 | AI Automations | OK | 5 plantillas + playbooks + AI Lab |
-| Workflows + canvas | OK | Agent, Classifier, Approval; Save/Run |
-| Motor + LLM | OK | OpenAI/Anthropic o demo; contexto entre agents |
+| Workflows + canvas | OK | Agent, Classifier, Approval, Delay, HTTP/Slack/Email; **Save versions** + **Test run / Safe mode** |
+| Motor + LLM | OK | OpenAI/Anthropic o demo; dry-run stub side effects |
 | Classifier (ramas) | OK | Rutas por handle/label |
+| Cron / delays / schedules | OK | Claim atómico + reaper de `running` stuck |
+| Email credentials | OK | Cifrado AES-GCM en reposo |
+| Unit tests (Vitest) | OK | grafo, crypto, rate-limit, dry-run |
 | Executions + logs AI | OK | Paneles de output |
 | Approvals web | OK | Con output del agente |
 | Approvals móvil Realtime | OK | Expo + `EXPO_PUBLIC_*` |

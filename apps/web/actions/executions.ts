@@ -18,13 +18,19 @@ async function requireSession() {
   return session;
 }
 
-export async function startExecution(workflowId: string, triggerText?: string) {
+export async function startExecution(
+  workflowId: string,
+  triggerText?: string,
+  options?: { dryRun?: boolean }
+) {
   const session = await requireSession();
   const supabase = await createClient();
+  const dryRun = Boolean(options?.dryRun);
 
   const triggerPayload = {
-    input: triggerText?.trim() || "Manual run",
+    input: triggerText?.trim() || (dryRun ? "Test run" : "Manual run"),
     startedBy: session.profile.full_name ?? session.user.email,
+    ...(dryRun ? { dryRun: true } : {}),
   };
 
   const { executionId } = await startWorkflowRun(supabase, {
@@ -32,6 +38,7 @@ export async function startExecution(workflowId: string, triggerText?: string) {
     workflowId,
     triggerPayload,
     requestedBy: session.profile.id,
+    dryRun,
   });
 
   revalidatePath("/dashboard/executions");

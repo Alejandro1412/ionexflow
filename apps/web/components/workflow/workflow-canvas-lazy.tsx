@@ -24,6 +24,12 @@ type Props = {
   initialActive: boolean;
   initialScheduleEnabled?: boolean;
   initialScheduleEveryMinutes?: number | null;
+  initialVersions?: Array<{
+    id: string;
+    version: number;
+    name: string;
+    created_at: string;
+  }>;
   aiStatus?: { live: boolean; label: string; hint: string };
 };
 

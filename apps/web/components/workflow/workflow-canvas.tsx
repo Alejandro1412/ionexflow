@@ -22,7 +22,7 @@ import "@xyflow/react/dist/style.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { saveWorkflow } from "@/actions/workflows";
+import { saveWorkflow, restoreWorkflowVersion } from "@/actions/workflows";
 import { startExecution } from "@/actions/executions";
 import { AGENT_MODE_META, type AgentMode } from "@/lib/ai/modes";
 import {
@@ -116,6 +116,7 @@ export function WorkflowCanvas({
   initialActive,
   initialScheduleEnabled = false,
   initialScheduleEveryMinutes = 60,
+  initialVersions = [],
   aiStatus,
 }: {
   workflowId: string;
@@ -125,6 +126,12 @@ export function WorkflowCanvas({
   initialActive: boolean;
   initialScheduleEnabled?: boolean;
   initialScheduleEveryMinutes?: number | null;
+  initialVersions?: Array<{
+    id: string;
+    version: number;
+    name: string;
+    created_at: string;
+  }>;
   aiStatus?: { live: boolean; label: string; hint: string };
 }) {
   const [name, setName] = useState(initialName);
@@ -148,6 +155,9 @@ export function WorkflowCanvas({
     "Cliente SaaS B2B — brief real para automatizar con IA"
   );
   const [saving, setSaving] = useState(false);
+  const [dryRun, setDryRun] = useState(true);
+  const [versions, setVersions] = useState(initialVersions);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const onConnect = useCallback((connection: Connection) => {
     setEdges((eds) =>
@@ -307,13 +317,39 @@ export function WorkflowCanvas({
         : null,
     });
     setSaving(false);
-    setStatus(result?.error ?? "Saved");
+    if (!result?.error) {
+      setVersions((prev) => [
+        {
+          id: `local-${Date.now()}`,
+          version: (prev[0]?.version ?? 0) + 1,
+          name,
+          created_at: new Date().toISOString(),
+        },
+        ...prev,
+      ].slice(0, 20));
+    }
+    setStatus(result?.error ?? "Saved (version snapshot)");
   }
 
-  async function onRun() {
+  async function onRun(asTest: boolean) {
     setStatus(null);
     await onSave();
-    await startExecution(workflowId, trigger);
+    await startExecution(workflowId, trigger, {
+      dryRun: asTest || dryRun,
+    });
+  }
+
+  async function onRestore(versionId: string) {
+    setRestoringId(versionId);
+    setStatus(null);
+    const result = await restoreWorkflowVersion(workflowId, versionId);
+    setRestoringId(null);
+    if (result?.error) {
+      setStatus(result.error);
+      return;
+    }
+    setStatus("Version restored — reloading…");
+    window.location.reload();
   }
 
   return (
@@ -397,9 +433,25 @@ export function WorkflowCanvas({
         <Button type="button" variant="outline" onClick={onSave} disabled={saving}>
           {saving ? "Saving…" : "Save"}
         </Button>
-        <Button type="button" onClick={onRun}>
-          Run
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onRun(true)}
+          title="Stubs email/HTTP/Slack/webhook; skips delays"
+        >
+          Test run
         </Button>
+        <Button type="button" onClick={() => onRun(false)}>
+          {dryRun ? "Run (safe)" : "Run live"}
+        </Button>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={dryRun}
+            onChange={(e) => setDryRun(e.target.checked)}
+          />
+          Safe mode (no external side effects)
+        </label>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[1fr_300px]">
@@ -683,7 +735,39 @@ export function WorkflowCanvas({
             </p>
           )}
 
-          <div className="mt-auto flex flex-col gap-1 border-t border-white/10 pt-3">
+          <div className="mt-auto flex flex-col gap-2 border-t border-white/10 pt-3">
+            <div>
+              <Label>Version history</Label>
+              {versions.length === 0 ? (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Save to create the first snapshot.
+                </p>
+              ) : (
+                <ul className="mt-2 max-h-36 space-y-1 overflow-y-auto text-xs">
+                  {versions.map((v) => (
+                    <li
+                      key={v.id}
+                      className="flex items-center justify-between gap-2 rounded border border-white/5 bg-black/20 px-2 py-1"
+                    >
+                      <span className="truncate text-muted-foreground">
+                        v{v.version} · {new Date(v.created_at).toLocaleString()}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-7 px-2 text-[10px]"
+                        disabled={
+                          restoringId === v.id || v.id.startsWith("local-")
+                        }
+                        onClick={() => onRestore(v.id)}
+                      >
+                        {restoringId === v.id ? "…" : "Restore"}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <Label>Run trigger / brief</Label>
             <textarea
               className="min-h-[72px] rounded-md border border-white/10 bg-black/30 p-2 text-sm"

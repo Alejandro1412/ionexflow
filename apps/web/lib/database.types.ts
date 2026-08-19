@@ -469,11 +469,76 @@ export interface Database {
         };
         Relationships: [];
       };
+      workflow_versions: {
+        Row: {
+          id: string;
+          workflow_id: string;
+          org_id: string;
+          version: number;
+          name: string;
+          nodes: Json;
+          edges: Json;
+          is_active: boolean;
+          schedule_enabled: boolean;
+          schedule_every_minutes: number | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workflow_id: string;
+          org_id: string;
+          version: number;
+          name: string;
+          nodes?: Json;
+          edges?: Json;
+          is_active?: boolean;
+          schedule_enabled?: boolean;
+          schedule_every_minutes?: number | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workflow_id?: string;
+          org_id?: string;
+          version?: number;
+          name?: string;
+          nodes?: Json;
+          edges?: Json;
+          is_active?: boolean;
+          schedule_enabled?: boolean;
+          schedule_every_minutes?: number | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_versions_workflow_id_fkey";
+            columns: ["workflow_id"];
+            isOneToOne: false;
+            referencedRelation: "workflows";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
       current_org_id: { Args: Record<string, never>; Returns: string };
       is_org_owner: { Args: Record<string, never>; Returns: boolean };
+      claim_due_delay_executions: {
+        Args: { p_limit?: number };
+        Returns: Database["public"]["Tables"]["workflow_executions"]["Row"][];
+      };
+      claim_due_schedules: {
+        Args: { p_limit?: number };
+        Returns: { id: string; org_id: string }[];
+      };
+      reap_stuck_running_executions: {
+        Args: { p_minutes?: number };
+        Returns: { id: string; org_id: string }[];
+      };
     };
     Enums: {
       plan_status: PlanStatus;

@@ -9,6 +9,8 @@ const PUBLIC_PATHS = [
   "/auth",
   "/api/stripe",
   "/api/approvals",
+  "/api/cron",
+  "/api/email",
 ];
 
 function isPublicPath(pathname: string) {

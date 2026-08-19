@@ -5,6 +5,10 @@ import {
 } from "@/lib/engine/start-run";
 import { fetchUnseenMail } from "@/lib/email/imap";
 import { rowToCredentials } from "@/lib/email/send";
+import {
+  allowRateLimit,
+  clientIpFromRequest,
+} from "@/lib/security/rate-limit";
 
 function authorizeCron(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -15,7 +19,6 @@ function authorizeCron(request: Request) {
     "";
   if (header === `Bearer ${secret}`) return true;
   if (header === secret) return true;
-  // Vercel Cron sends Authorization: Bearer <CRON_SECRET> when configured
   return false;
 }
 
@@ -25,27 +28,55 @@ async function runTick() {
     resumedDelays: 0,
     emailSynced: 0,
     scheduledRuns: 0,
+    reapedStuck: 0,
     errors: [] as string[],
   };
 
-  // 1) Resume delays
-  const { data: waiting } = await admin
-    .from("workflow_executions")
-    .select("id")
-    .eq("status", "paused")
-    .not("waiting_node_id", "is", null)
-    .lte("resume_at", new Date().toISOString())
-    .limit(25);
-
-  for (const row of waiting ?? []) {
-    try {
-      const r = await resumeWaitingExecution(admin, row.id);
-      if (!r.skipped) summary.resumedDelays += 1;
-    } catch (error) {
-      summary.errors.push(
-        `delay ${row.id}: ${error instanceof Error ? error.message : "fail"}`
-      );
+  // 0) Reap zombie running executions (hung / timed-out workers)
+  try {
+    const { data: reaped, error: reapError } = await admin.rpc(
+      "reap_stuck_running_executions",
+      { p_minutes: 15 }
+    );
+    if (reapError) {
+      summary.errors.push(`reaper: ${reapError.message}`);
+    } else {
+      summary.reapedStuck = (reaped as unknown[] | null)?.length ?? 0;
     }
+  } catch (error) {
+    summary.errors.push(
+      `reaper: ${error instanceof Error ? error.message : "fail"}`
+    );
+  }
+
+  // 1) Atomically claim due delays, then resume
+  try {
+    const { data: claimed, error: claimError } = await admin.rpc(
+      "claim_due_delay_executions",
+      { p_limit: 25 }
+    );
+    if (claimError) {
+      summary.errors.push(`claim delays: ${claimError.message}`);
+    } else {
+      for (const row of claimed ?? []) {
+        try {
+          const r = await resumeWaitingExecution(admin, row.id, {
+            alreadyClaimed: true,
+          });
+          if (!r.skipped) summary.resumedDelays += 1;
+        } catch (error) {
+          summary.errors.push(
+            `delay ${row.id}: ${
+              error instanceof Error ? error.message : "fail"
+            }`
+          );
+        }
+      }
+    }
+  } catch (error) {
+    summary.errors.push(
+      `claim delays: ${error instanceof Error ? error.message : "fail"}`
+    );
   }
 
   // 2) Email auto-sync
@@ -141,45 +172,41 @@ async function runTick() {
     }
   }
 
-  // 3) Scheduled workflows
-  const { data: scheduled } = await admin
-    .from("workflows")
-    .select("id, org_id, schedule_every_minutes, last_scheduled_at")
-    .eq("is_active", true)
-    .eq("schedule_enabled", true)
-    .not("schedule_every_minutes", "is", null)
-    .limit(50);
-
-  const now = Date.now();
-  for (const wf of scheduled ?? []) {
-    try {
-      const every = Number(wf.schedule_every_minutes);
-      if (!every || every < 5) continue;
-      const last = wf.last_scheduled_at
-        ? new Date(wf.last_scheduled_at).getTime()
-        : 0;
-      if (now - last < every * 60_000) continue;
-
-      await startWorkflowRun(admin, {
-        orgId: wf.org_id,
-        workflowId: wf.id,
-        triggerPayload: {
-          input: "Scheduled run",
-          channel: "schedule",
-          startedBy: "cron",
-          orgId: wf.org_id,
-        },
-      });
-      await admin
-        .from("workflows")
-        .update({ last_scheduled_at: new Date().toISOString() })
-        .eq("id", wf.id);
-      summary.scheduledRuns += 1;
-    } catch (error) {
-      summary.errors.push(
-        `schedule ${wf.id}: ${error instanceof Error ? error.message : "fail"}`
-      );
+  // 3) Atomically claim due schedules (sets last_scheduled_at)
+  try {
+    const { data: scheduled, error: schedError } = await admin.rpc(
+      "claim_due_schedules",
+      { p_limit: 50 }
+    );
+    if (schedError) {
+      summary.errors.push(`claim schedules: ${schedError.message}`);
+    } else {
+      for (const wf of scheduled ?? []) {
+        try {
+          await startWorkflowRun(admin, {
+            orgId: wf.org_id,
+            workflowId: wf.id,
+            triggerPayload: {
+              input: "Scheduled run",
+              channel: "schedule",
+              startedBy: "cron",
+              orgId: wf.org_id,
+            },
+          });
+          summary.scheduledRuns += 1;
+        } catch (error) {
+          summary.errors.push(
+            `schedule ${wf.id}: ${
+              error instanceof Error ? error.message : "fail"
+            }`
+          );
+        }
+      }
     }
+  } catch (error) {
+    summary.errors.push(
+      `claim schedules: ${error instanceof Error ? error.message : "fail"}`
+    );
   }
 
   return summary;
@@ -189,6 +216,12 @@ export async function GET(request: Request) {
   if (!authorizeCron(request)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const ip = clientIpFromRequest(request);
+  if (!allowRateLimit(`cron:${ip}`, { limit: 30, windowMs: 60_000 })) {
+    return Response.json({ error: "Rate limited" }, { status: 429 });
+  }
+
   const summary = await runTick();
   return Response.json({ ok: true, ...summary });
 }

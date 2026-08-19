@@ -2,6 +2,7 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 import type { MailboxCredentials } from "@/lib/email/presets";
 import { sendViaSmtp } from "@/lib/email/smtp";
 import type { OutboundEmailResult } from "@/lib/email/smtp";
+import { decryptSecret } from "@/lib/email/crypto";
 
 export function rowToCredentials(row: {
   email_address: string | null;
@@ -23,10 +24,19 @@ export function rowToCredentials(row: {
   ) {
     return null;
   }
+
+  let password: string;
+  try {
+    password = decryptSecret(row.password) ?? "";
+  } catch {
+    return null;
+  }
+  if (!password) return null;
+
   return {
     emailAddress: row.email_address,
     username: row.username,
-    password: row.password,
+    password,
     imapHost: row.imap_host,
     imapPort: row.imap_port ?? 993,
     imapSecure: row.imap_secure ?? true,

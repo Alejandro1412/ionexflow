@@ -17,9 +17,16 @@ export async function startWorkflowRun(
     workflowId: string;
     triggerPayload: Record<string, unknown>;
     requestedBy?: string | null;
+    dryRun?: boolean;
   }
 ) {
-  const { orgId, workflowId, triggerPayload, requestedBy = null } = options;
+  const {
+    orgId,
+    workflowId,
+    triggerPayload,
+    requestedBy = null,
+    dryRun = false,
+  } = options;
 
   const { data: workflow } = await supabase
     .from("workflows")
@@ -32,13 +39,18 @@ export async function startWorkflowRun(
   const nodes = (workflow.nodes as FlowNode[]) ?? [];
   const edges = (workflow.edges as FlowEdge[]) ?? [];
 
+  const payload = {
+    ...triggerPayload,
+    ...(dryRun ? { dryRun: true } : {}),
+  };
+
   const { data: execution, error } = await supabase
     .from("workflow_executions")
     .insert({
       workflow_id: workflowId,
       org_id: orgId,
       status: "running",
-      trigger_payload: triggerPayload,
+      trigger_payload: payload,
       logs: [],
       started_at: new Date().toISOString(),
     })
@@ -53,9 +65,10 @@ export async function startWorkflowRun(
     nodes,
     edges,
     triggerPayload: {
-      ...triggerPayload,
+      ...payload,
       orgId,
     },
+    dryRun,
   });
 
   await persistRunnerResult(supabase, {
@@ -71,21 +84,42 @@ export async function startWorkflowRun(
   };
 }
 
-/** Resume a delay-paused execution after resume_at. */
+/**
+ * Resume a delay-paused execution.
+ * Prefer calling after claim_due_delay_executions (already status=running).
+ * Falls back to an atomic claim when invoked with a paused id.
+ */
 export async function resumeWaitingExecution(
   supabase: Client,
-  executionId: string
+  executionId: string,
+  options?: { alreadyClaimed?: boolean }
 ) {
-  const { data: execution } = await supabase
-    .from("workflow_executions")
-    .select("*, workflows(*)")
-    .eq("id", executionId)
-    .single();
+  let execution: Record<string, unknown> | null = null;
 
-  if (!execution || execution.status !== "paused" || !execution.waiting_node_id) {
-    return { skipped: true as const };
+  if (options?.alreadyClaimed) {
+    const { data } = await supabase
+      .from("workflow_executions")
+      .select("*, workflows(*)")
+      .eq("id", executionId)
+      .eq("status", "running")
+      .not("waiting_node_id", "is", null)
+      .maybeSingle();
+    execution = data;
+  } else {
+    // Atomic claim: only one worker wins
+    const { data } = await supabase
+      .from("workflow_executions")
+      .update({ status: "running" })
+      .eq("id", executionId)
+      .eq("status", "paused")
+      .not("waiting_node_id", "is", null)
+      .lte("resume_at", new Date().toISOString())
+      .select("*, workflows(*)")
+      .maybeSingle();
+    execution = data;
   }
-  if (execution.resume_at && new Date(execution.resume_at) > new Date()) {
+
+  if (!execution || !execution.waiting_node_id) {
     return { skipped: true as const };
   }
 
@@ -94,15 +128,19 @@ export async function resumeWaitingExecution(
   const edges = (workflow.edges as FlowEdge[]) ?? [];
   const waitingNodeId = execution.waiting_node_id as string;
   const orgId = execution.org_id as string;
+  const triggerPayload =
+    (execution.trigger_payload as Record<string, unknown>) ?? {};
+  const dryRun = Boolean(triggerPayload.dryRun);
 
+  // Clear wait markers now that we own the resume
   await supabase
     .from("workflow_executions")
     .update({
-      status: "running",
       resume_at: null,
       waiting_node_id: null,
     })
-    .eq("id", executionId);
+    .eq("id", executionId)
+    .eq("status", "running");
 
   const existingLogs = (execution.logs as unknown[]) ?? [];
   const result = await runWorkflowGraph({
@@ -110,7 +148,8 @@ export async function resumeWaitingExecution(
     edges,
     fromNodeId: waitingNodeId,
     skipCurrent: true,
-    triggerPayload: (execution.trigger_payload as Record<string, unknown>) ?? {},
+    triggerPayload,
+    dryRun,
     existingLogs: [
       ...(existingLogs as import("@/lib/workflow/types").ExecutionLogEntry[]),
       {

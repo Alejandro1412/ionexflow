@@ -9,6 +9,7 @@ import { MAIL_PRESETS, type MailPresetKey } from "@/lib/email/presets";
 import { verifyImap, fetchUnseenMail } from "@/lib/email/imap";
 import { verifySmtp } from "@/lib/email/smtp";
 import { rowToCredentials } from "@/lib/email/send";
+import { encryptSecret } from "@/lib/email/crypto";
 
 export type EmailActionState = { ok?: boolean; error?: string; synced?: number };
 
@@ -96,7 +97,7 @@ export async function connectMailbox(
       display_name: display,
       email_address: emailAddress,
       username,
-      password,
+      password: encryptSecret(password),
       imap_host: imapHost,
       imap_port: imapPort,
       imap_secure: imapSecure,
@@ -107,7 +108,7 @@ export async function connectMailbox(
       forward_to: forwardTo,
       connected_at: new Date().toISOString(),
       last_error: null,
-      meta: { preset, verifiedAt: new Date().toISOString() },
+      meta: { preset, verifiedAt: new Date().toISOString(), encrypted: true },
     };
 
     if (existing?.id) {

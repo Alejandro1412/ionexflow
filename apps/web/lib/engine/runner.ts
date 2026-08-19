@@ -1,5 +1,6 @@
 import { generateWithMode, generateAgentOutput } from "@/lib/ai/provider";
 import type { AgentMode } from "@/lib/ai/modes";
+import { nextNodeId } from "@/lib/engine/graph";
 import { executeHttpRequest, renderTemplate } from "@/lib/engine/http";
 import { sendOutboundEmail } from "@/lib/email/send";
 import type {
@@ -54,18 +55,6 @@ function log(
   return { at: new Date().toISOString(), nodeId, level, message, ...extra };
 }
 
-function nextNodeId(nodeId: string, edges: FlowEdge[], route?: string) {
-  if (route) {
-    const match = edges.find(
-      (e) =>
-        e.source === nodeId &&
-        (e.label === route || e.sourceHandle === route)
-    );
-    if (match) return match.target;
-  }
-  return edges.find((e) => e.source === nodeId)?.target ?? null;
-}
-
 function getData(node: FlowNode): FlowNodeData {
   return node.data;
 }
@@ -108,8 +97,9 @@ async function runEmailNode(options: {
   context: Record<string, string>;
   triggerPayload: Record<string, unknown>;
   mode: "email_send" | "email_forward";
+  dryRun?: boolean;
 }): Promise<"ok" | { error: string }> {
-  const { node, data, logs, context, triggerPayload, mode } = options;
+  const { node, data, logs, context, triggerPayload, mode, dryRun } = options;
   const vars = templateVars(data, logs, context, triggerPayload);
   const failOnError = data.failOnError !== false;
 
@@ -140,6 +130,19 @@ async function runEmailNode(options: {
     const message = `${mode} node "${data.label}" has no recipient`;
     logs.push(log(node.id, message, "error"));
     return { error: message };
+  }
+
+  if (dryRun) {
+    const summary = `[dry-run] would ${mode === "email_forward" ? "forward" : "send"} email to ${to}`;
+    context[data.label] = summary;
+    logs.push(
+      log(node.id, summary, "warn", {
+        kind: "email_output",
+        output: text,
+        provider: "dry-run",
+      })
+    );
+    return "ok";
   }
 
   logs.push(
@@ -187,8 +190,9 @@ async function runOutboundNode(options: {
   context: Record<string, string>;
   triggerPayload: Record<string, unknown>;
   mode: "http" | "slack" | "webhook";
+  dryRun?: boolean;
 }): Promise<"ok" | { error: string }> {
-  const { node, data, logs, context, triggerPayload, mode } = options;
+  const { node, data, logs, context, triggerPayload, mode, dryRun } = options;
   const vars = templateVars(data, logs, context, triggerPayload);
   const failOnError = data.failOnError !== false;
 
@@ -196,6 +200,20 @@ async function runOutboundNode(options: {
     const message = `${mode} node "${data.label}" has no URL configured`;
     logs.push(log(node.id, message, "error"));
     return { error: message };
+  }
+
+  if (dryRun) {
+    const summary = `[dry-run] would ${mode.toUpperCase()} ${data.method ?? "POST"} ${data.url.trim()}`;
+    context[data.label] = summary;
+    logs.push(
+      log(node.id, summary, "warn", {
+        kind: "http_output",
+        output: summary,
+        statusCode: 0,
+        latencyMs: 0,
+      })
+    );
+    return "ok";
   }
 
   let method = data.method ?? "POST";
@@ -293,13 +311,26 @@ export async function runWorkflowGraph(options: {
   skipCurrent?: boolean;
   triggerPayload?: Record<string, unknown>;
   existingLogs?: ExecutionLogEntry[];
+  /** Stub HTTP/Slack/Webhook/Email side effects; skip real Delay waits. */
+  dryRun?: boolean;
 }): Promise<RunnerResult> {
   const { nodes, edges, triggerPayload = {}, existingLogs = [] } = options;
+  const dryRun = Boolean(options.dryRun ?? triggerPayload.dryRun);
   const logs = [...existingLogs];
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const context: Record<string, string> = {};
   const orgId =
     typeof triggerPayload.orgId === "string" ? triggerPayload.orgId : undefined;
+
+  if (dryRun) {
+    logs.push(
+      log(
+        "system",
+        "Test run: external side effects (email/HTTP/Slack/webhook) are stubbed; delays are skipped.",
+        "warn"
+      )
+    );
+  }
 
   for (const entry of existingLogs) {
     if (
@@ -508,6 +539,7 @@ export async function runWorkflowGraph(options: {
               context,
               triggerPayload,
               mode: data.type as "http" | "slack" | "webhook",
+              dryRun,
             });
           },
           (value) => value === "ok"
@@ -540,6 +572,7 @@ export async function runWorkflowGraph(options: {
               context,
               triggerPayload,
               mode: data.type as "email_send" | "email_forward",
+              dryRun,
             });
           },
           (value) => value === "ok"
@@ -555,6 +588,17 @@ export async function runWorkflowGraph(options: {
           1,
           Math.min(10080, Number(data.waitMinutes ?? 60) || 60)
         );
+        if (dryRun) {
+          logs.push(
+            log(
+              node.id,
+              `[dry-run] delay of ${minutes} minute(s) skipped`,
+              "warn"
+            )
+          );
+          currentId = nextNodeId(node.id, edges);
+          break;
+        }
         const resumeAt = new Date(Date.now() + minutes * 60_000).toISOString();
         logs.push(
           log(

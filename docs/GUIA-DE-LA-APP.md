@@ -1,9 +1,10 @@
 # IonexFlow — Guía completa del producto
 
-Documento oficial: **para qué es**, **qué se puede hacer hoy (al detalle)**, **cómo lo usa una empresa** y **qué falta para ser una app pro lista para clientes B2B**.
+Documento oficial: **para qué es**, **qué se puede hacer hoy**, **cómo lo usa una empresa** y **qué falta**.
 
+> **Manual paso a paso al máximo detalle:** [MANUAL-COMPLETO.md](./MANUAL-COMPLETO.md)  
 > Repo: [github.com/Alejandro1412/ionexflow](https://github.com/Alejandro1412/ionexflow)  
-> Ver también: [Estado funcional](./ESTADO-FUNCIONAL.md) · [Plan siguiente](./PLAN-SIGUIENTE.md)
+> Ver también: [Estado funcional](./ESTADO-FUNCIONAL.md) · [Plan siguiente](./PLAN-SIGUIENTE.md) · [Deploy](./DEPLOY.md)
 
 ---
 

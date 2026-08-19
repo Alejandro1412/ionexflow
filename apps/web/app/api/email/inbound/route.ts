@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { processInboundEmailPayload } from "@/actions/email";
+import {
+  allowRateLimit,
+  clientIpFromRequest,
+} from "@/lib/security/rate-limit";
 
 /**
  * Inbound email webhook for enterprise mail automation.
@@ -16,6 +20,11 @@ export async function POST(request: Request) {
     if (header !== secret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+  }
+
+  const ip = clientIpFromRequest(request);
+  if (!allowRateLimit(`email-inbound:${ip}`, { limit: 60, windowMs: 60_000 })) {
+    return NextResponse.json({ error: "Rate limited" }, { status: 429 });
   }
 
   let json: Record<string, unknown>;
@@ -37,6 +46,11 @@ export async function POST(request: Request) {
       { error: "token, from, and body are required" },
       { status: 400 }
     );
+  }
+
+  // Per-token cap: leaked inbound token shouldn't burn AI quota unbounded
+  if (!allowRateLimit(`email-token:${token}`, { limit: 40, windowMs: 60_000 })) {
+    return NextResponse.json({ error: "Rate limited" }, { status: 429 });
   }
 
   const result = await processInboundEmailPayload({

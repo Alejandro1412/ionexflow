@@ -16,6 +16,7 @@ npx vercel --prod --yes --scope alejandro-polanco-andrades-projects
 ```
 
 One-shot schema (SQL Editor): paste `scripts/prod-all-migrations.sql`  
+Hardening (claim/reaper/versions): paste `scripts/prod-migration-hardening.sql`  
 Auth Site URL must be `https://ionexflow.vercel.app`
 
 ## Architecture
@@ -106,6 +107,10 @@ OPENAI_API_KEY=
 RESEND_API_KEY=
 RESEND_FROM=IonexFlow <billing@yourdomain.com>
 EMAIL_INBOUND_SECRET=
+
+# Recommended: AES-256 key for mailbox passwords (64 hex chars or 32-byte base64)
+# Without it, the app derives from SUPABASE_SERVICE_ROLE_KEY (dev/fallback only).
+EMAIL_CREDENTIALS_ENCRYPTION_KEY=
 ```
 
 5. Deploy
@@ -122,6 +127,34 @@ EMAIL_INBOUND_SECRET=
 4. After success, plan should become `active` (sync from Checkout session + webhook)
 5. Customer portal opens for the Stripe customer
 6. Confirm `Activate Pro (dev)` is **not** shown
+7. Workflow editor → **Test run** (Safe mode) → execution completes without sending real Slack/email
+8. **Save** → version appears in history → optional **Restore**
+9. If a mailbox was connected before encryption: **Integrations → reconnect** so the password is stored as `enc:v1:…`
+
+---
+
+## 4b. Hardening checklist (current prod)
+
+| Step | Status / action |
+|------|-----------------|
+| SQL `scripts/prod-migration-hardening.sql` | Apply in Supabase SQL Editor (functions + `workflow_versions`) |
+| `EMAIL_CREDENTIALS_ENCRYPTION_KEY` on Vercel Production | Required for new mailbox connects; set via CLI or dashboard |
+| `CRON_SECRET` + external cron → `/api/cron/tick` | Required for delays/schedules/IMAP auto-sync |
+| Redeploy after env changes | Env vars apply on next deployment |
+
+Generate a key locally (do not commit it):
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Then: Vercel → Project → Settings → Environment Variables → Production → add `EMAIL_CREDENTIALS_ENCRYPTION_KEY`, or:
+
+```powershell
+# pipe the hex key into stdin (never paste into chat logs)
+echo YOUR_64_HEX_KEY | npx vercel env add EMAIL_CREDENTIALS_ENCRYPTION_KEY production --scope alejandro-polanco-andrades-projects --force --yes
+npx vercel --prod --yes --scope alejandro-polanco-andrades-projects
+```
 
 ---
 
@@ -140,8 +173,10 @@ Put the CLI `whsec_...` into `apps/web/.env.local` as `STRIPE_WEBHOOK_SECRET`.
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` only on server (Vercel env), never `NEXT_PUBLIC_`
 - [ ] No `ALLOW_DEV_BILLING_BYPASS` in Production
 - [ ] Stripe live keys only on Production; use test keys on Preview if desired
-- [ ] RLS migrations applied (`email_connections` passwords protected by org RLS — rotate if leaked)
+- [ ] RLS migrations applied; mailbox passwords encrypted (`EMAIL_CREDENTIALS_ENCRYPTION_KEY`)
+- [ ] Schema changes only via `supabase/migrations/` (Cloud SQL scripts are mirrors, not a second source of truth)
 - [ ] `NEXT_PUBLIC_SITE_URL` matches the real HTTPS domain (Checkout success/cancel URLs)
+- [ ] Cron + inbound email endpoints rate-limited and secret-protected
 
 ---
 
@@ -154,3 +189,6 @@ Put the CLI `whsec_...` into `apps/web/.env.local` as `STRIPE_WEBHOOK_SECRET`.
 | Portal button missing | Complete one Checkout so `stripe_customer_id` is saved |
 | Auth redirect errors | Supabase Site URL + Google redirect must match prod hosts |
 | Build fails on Vercel | Root Directory = `apps/web`; install from monorepo root via `vercel.json` |
+| Duplicate Slack/email after cron | Ensure hardening SQL applied (`claim_due_*` RPCs) |
+| Mailbox connect fails after deploy | Set `EMAIL_CREDENTIALS_ENCRYPTION_KEY` and redeploy; reconnect mailbox |
+| Delay/schedule never advances | Cron hitting `/api/cron/tick` with `CRON_SECRET` every ~5m |
