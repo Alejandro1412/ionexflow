@@ -17,6 +17,7 @@ npx vercel --prod --yes --scope alejandro-polanco-andrades-projects
 
 One-shot schema (SQL Editor): paste `scripts/prod-all-migrations.sql`  
 Hardening (claim/reaper/versions): paste `scripts/prod-migration-hardening.sql`  
+Business features (SLA/audit/overage): paste `scripts/prod-migration-business-features.sql`  
 Auth Site URL must be `https://ionexflow.vercel.app`
 
 ## Architecture

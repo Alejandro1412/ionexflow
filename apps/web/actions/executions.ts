@@ -46,9 +46,17 @@ export async function startExecution(
   redirect(`/dashboard/executions/${executionId}`);
 }
 
-export async function resolveApproval(approvalId: string, decision: "approved" | "rejected") {
+export async function resolveApproval(
+  approvalId: string,
+  decision: "approved" | "rejected",
+  editedOutput?: string | null
+) {
   await requireSession();
-  const { executionId } = await resolveApprovalForCurrentUser(approvalId, decision);
+  const { executionId } = await resolveApprovalForCurrentUser(
+    approvalId,
+    decision,
+    editedOutput
+  );
   revalidatePath("/dashboard/approvals");
   revalidatePath("/dashboard/executions");
   revalidatePath(`/dashboard/executions/${executionId}`);

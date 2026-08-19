@@ -9,6 +9,7 @@ import {
   allowRateLimit,
   clientIpFromRequest,
 } from "@/lib/security/rate-limit";
+import { escalateDueApprovals } from "@/lib/approvals/escalate";
 
 function authorizeCron(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -29,6 +30,7 @@ async function runTick() {
     emailSynced: 0,
     scheduledRuns: 0,
     reapedStuck: 0,
+    escalatedApprovals: 0,
     errors: [] as string[],
   };
 
@@ -46,6 +48,17 @@ async function runTick() {
   } catch (error) {
     summary.errors.push(
       `reaper: ${error instanceof Error ? error.message : "fail"}`
+    );
+  }
+
+  // 0b) Approval SLA escalations
+  try {
+    const esc = await escalateDueApprovals(admin);
+    summary.escalatedApprovals = esc.escalated;
+    summary.errors.push(...esc.errors.map((e) => `sla: ${e}`));
+  } catch (error) {
+    summary.errors.push(
+      `sla: ${error instanceof Error ? error.message : "fail"}`
     );
   }
 

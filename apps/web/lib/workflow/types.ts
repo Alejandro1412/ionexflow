@@ -5,6 +5,7 @@ export type WorkflowNodeType =
   | "start"
   | "agent"
   | "classifier"
+  | "condition"
   | "approval"
   | "delay"
   | "http"
@@ -42,6 +43,13 @@ export type FlowNodeData = {
   subjectTemplate?: string;
   bodyEmailTemplate?: string;
   fromAddress?: string;
+  /** Deterministic condition (no LLM) */
+  conditionLeft?: string;
+  conditionOp?: string;
+  conditionRight?: string;
+  /** Approval SLA minutes (0 = none); Slack webhook for Approve/Reject buttons */
+  slaMinutes?: number;
+  approvalSlackWebhook?: string;
 };
 
 export type FlowNode = {

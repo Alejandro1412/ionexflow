@@ -140,6 +140,16 @@ export async function saveWorkflow(
 
   if (error) return { error: error.message };
 
+  const { writeAuditEvent } = await import("@/lib/audit");
+  await writeAuditEvent({
+    orgId,
+    actorId: access.session.profile.id,
+    action: "workflow.saved",
+    targetType: "workflow",
+    targetId: workflowId,
+    meta: { name: input.name, is_active: input.is_active },
+  });
+
   // Snapshot version history (best-effort; do not fail Save)
   try {
     const { data: latest } = await supabase

@@ -910,13 +910,22 @@ Agent → Delay 60 → Approval → Email send.
 - OAuth nativo Gmail/Microsoft Graph (hoy: app password cifrado)  
 - OAuth nativo LinkedIn/Buffer  
 - Expo push  
-- Paralelismo fan-out/join  
-- Aprobación editable / SLA / botones Slack  
-- Analytics de costo por workflow  
-- Audit log admin a nivel org  
-- Facturación metered por overage  
-- Playwright E2E completo (sí hay unit tests Vitest del grafo/crypto/dry-run)  
+- Fan-out completo con join arbitrario (hoy: paralelo de nodos outbound hermanos)  
+- Stripe metered price automático por overage (hoy: sigue live + contabiliza `ai_overage_tokens`)  
 - Marketplace multi-LLM  
+
+### Ya cubierto (valor de negocio reciente)
+
+- Versionado + restore de workflows  
+- Test run / Safe mode  
+- Aprobación editable  
+- Slack Approve/Reject (links firmados en webhook)  
+- SLA de approvals (cron escalate)  
+- Analytics `/dashboard/analytics`  
+- Audit log `/dashboard/audit`  
+- Nodo Condition determinista  
+- Cifrado de passwords de mailbox  
+- Overage: no apaga a demo por defecto  
 
 ---
 

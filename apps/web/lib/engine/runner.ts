@@ -1,6 +1,7 @@
 import { generateWithMode, generateAgentOutput } from "@/lib/ai/provider";
 import type { AgentMode } from "@/lib/ai/modes";
-import { nextNodeId } from "@/lib/engine/graph";
+import { nextNodeId, allOutgoing } from "@/lib/engine/graph";
+import { evaluateCondition } from "@/lib/engine/condition";
 import { executeHttpRequest, renderTemplate } from "@/lib/engine/http";
 import { sendOutboundEmail } from "@/lib/email/send";
 import type {
@@ -302,7 +303,112 @@ async function runOutboundNode(options: {
 }
 
 /**
- * Walks the graph: agents, classifiers, approvals, HTTP/Slack/Webhook.
+ * After a node completes: if multiple unlabeled outgoing edges target
+ * outbound nodes (http/slack/webhook/email), run them in parallel (fan-out),
+ * then continue to their common next node when possible.
+ */
+async function advanceAfterNode(options: {
+  nodeId: string;
+  edges: FlowEdge[];
+  byId: Map<string, FlowNode>;
+  logs: ExecutionLogEntry[];
+  context: Record<string, string>;
+  triggerPayload: Record<string, unknown>;
+  dryRun?: boolean;
+}): Promise<{ nextId: string | null; error?: string }> {
+  const { nodeId, edges, byId, logs, context, triggerPayload, dryRun } =
+    options;
+  const outs = allOutgoing(nodeId, edges);
+  if (outs.length <= 1) {
+    return { nextId: outs[0]?.target ?? null };
+  }
+
+  const targets = outs
+    .map((e) => byId.get(e.target))
+    .filter((n): n is FlowNode => Boolean(n));
+  const outboundTypes = new Set([
+    "http",
+    "slack",
+    "webhook",
+    "email_send",
+    "email_forward",
+  ]);
+  const allOutbound = targets.every((t) =>
+    outboundTypes.has(getData(t).type)
+  );
+
+  if (!allOutbound) {
+    logs.push(
+      log(
+        nodeId,
+        `Multiple edges detected — following first path (${targets[0]?.id}). Use Condition/Classifier for routed forks.`,
+        "warn"
+      )
+    );
+    return { nextId: outs[0]?.target ?? null };
+  }
+
+  logs.push(
+    log(
+      nodeId,
+      `Fan-out: running ${targets.length} outbound nodes in parallel`,
+      "warn"
+    )
+  );
+
+  const results = await Promise.all(
+    targets.map(async (target) => {
+      const td = getData(target);
+      if (td.type === "email_send" || td.type === "email_forward") {
+        return runEmailNode({
+          node: target,
+          data: td,
+          logs,
+          context,
+          triggerPayload,
+          mode: td.type,
+          dryRun,
+        });
+      }
+      return runOutboundNode({
+        node: target,
+        data: td,
+        logs,
+        context,
+        triggerPayload,
+        mode: td.type as "http" | "slack" | "webhook",
+        dryRun,
+      });
+    })
+  );
+
+  for (const r of results) {
+    if (r !== "ok") {
+      return { nextId: null, error: r.error };
+    }
+  }
+
+  const nextIds = new Set<string>();
+  for (const t of targets) {
+    const n = nextNodeId(t.id, edges);
+    if (n) nextIds.add(n);
+  }
+
+  if (nextIds.size === 0) return { nextId: null };
+  if (nextIds.size === 1) return { nextId: [...nextIds][0]! };
+
+  logs.push(
+    log(
+      nodeId,
+      `Fan-out join ambiguous (${nextIds.size} successors) — continuing with first`,
+      "warn"
+    )
+  );
+  return { nextId: [...nextIds][0]! };
+}
+
+/**
+ * Walks the graph: agents, classifiers, conditions, approvals, HTTP/Slack/Webhook.
  */
 export async function runWorkflowGraph(options: {
   nodes: FlowNode[];
@@ -353,7 +459,25 @@ export async function runWorkflowGraph(options: {
   }
 
   if (options.skipCurrent) {
-    currentId = nextNodeId(currentId, edges);
+    const fromId = currentId;
+    const adv = await advanceAfterNode({
+      nodeId: fromId!,
+      edges,
+      byId,
+      logs,
+      context,
+      triggerPayload,
+      dryRun,
+    });
+    if (adv.error) {
+      return { kind: "failed", logs, error: adv.error };
+    }
+    // Fan-out already executed parallel children — continue from join
+    if (allOutgoing(fromId!, edges).length > 1) {
+      currentId = adv.nextId;
+    } else {
+      currentId = nextNodeId(fromId!, edges);
+    }
   }
 
   let guard = 0;
@@ -449,7 +573,21 @@ export async function runWorkflowGraph(options: {
           return { kind: "failed", logs, error: message };
         }
 
-        currentId = nextNodeId(node.id, edges);
+        {
+          const adv = await advanceAfterNode({
+            nodeId: node.id,
+            edges,
+            byId,
+            logs,
+            context,
+            triggerPayload,
+            dryRun,
+          });
+          if (adv.error) {
+            return { kind: "failed", logs, error: adv.error };
+          }
+          currentId = adv.nextId;
+        }
         break;
       }
       case "classifier": {
@@ -516,6 +654,53 @@ export async function runWorkflowGraph(options: {
         }
         break;
       }
+      case "condition": {
+        const base = templateVars(data, logs, context, triggerPayload);
+        const flatVars: Record<string, string> = {
+          ...context,
+          agentOutput: base.agentOutput,
+          trigger: base.trigger,
+          label: base.label,
+          from: base.from,
+          to: base.to,
+          subject: base.subject,
+          body: base.body,
+          amount: String(
+            (triggerPayload as { amount?: unknown }).amount ??
+              context.amount ??
+              ""
+          ),
+          status: String(
+            (triggerPayload as { status?: unknown }).status ??
+              context.status ??
+              ""
+          ),
+        };
+        const evaluated = evaluateCondition({
+          leftRaw: data.conditionLeft ?? "{{trigger}}",
+          op: data.conditionOp ?? "contains",
+          rightRaw: data.conditionRight ?? "",
+          vars: flatVars,
+        });
+        context[data.label] = `condition=${evaluated.route}`;
+        logs.push(
+          log(
+            node.id,
+            `Condition "${data.label}": "${evaluated.left}" ${data.conditionOp ?? "eq"} "${evaluated.right}" → ${evaluated.route}`,
+            "success",
+            { kind: "route", output: evaluated.route, route: evaluated.route }
+          )
+        );
+        currentId = nextNodeId(node.id, edges, evaluated.route);
+        if (!currentId) {
+          return {
+            kind: "failed",
+            logs,
+            error: `No edge for condition route "${evaluated.route}" on ${node.id}`,
+          };
+        }
+        break;
+      }
       case "http":
       case "slack":
       case "webhook": {
@@ -547,7 +732,21 @@ export async function runWorkflowGraph(options: {
         if (outbound !== "ok") {
           return { kind: "failed", logs, error: outbound.error };
         }
-        currentId = nextNodeId(node.id, edges);
+        {
+          const adv = await advanceAfterNode({
+            nodeId: node.id,
+            edges,
+            byId,
+            logs,
+            context,
+            triggerPayload,
+            dryRun,
+          });
+          if (adv.error) {
+            return { kind: "failed", logs, error: adv.error };
+          }
+          currentId = adv.nextId;
+        }
         break;
       }
       case "email_send":
@@ -580,7 +779,21 @@ export async function runWorkflowGraph(options: {
         if (mail !== "ok") {
           return { kind: "failed", logs, error: mail.error };
         }
-        currentId = nextNodeId(node.id, edges);
+        {
+          const adv = await advanceAfterNode({
+            nodeId: node.id,
+            edges,
+            byId,
+            logs,
+            context,
+            triggerPayload,
+            dryRun,
+          });
+          if (adv.error) {
+            return { kind: "failed", logs, error: adv.error };
+          }
+          currentId = adv.nextId;
+        }
         break;
       }
       case "delay": {
@@ -616,10 +829,16 @@ export async function runWorkflowGraph(options: {
       }
       case "approval": {
         const latest = lastAgentOutput(logs);
+        const slaMinutes = Math.max(
+          0,
+          Math.min(10080, Number(data.slaMinutes ?? 0) || 0)
+        );
         logs.push(
           log(
             node.id,
-            `Paused for approval: ${data.message ?? data.label}`,
+            `Paused for approval: ${data.message ?? data.label}${
+              slaMinutes ? ` (SLA ${slaMinutes}m)` : ""
+            }`,
             "warn"
           )
         );
@@ -641,6 +860,8 @@ export async function runWorkflowGraph(options: {
             latencyMs: latest?.latencyMs ?? null,
             context,
             triggerPayload,
+            slaMinutes: slaMinutes || null,
+            approvalSlackWebhook: data.approvalSlackWebhook ?? null,
           },
         };
       }

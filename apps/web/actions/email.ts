@@ -118,6 +118,14 @@ export async function connectMailbox(
     }
 
     revalidatePath("/dashboard/integrations");
+    const { writeAuditEvent } = await import("@/lib/audit");
+    await writeAuditEvent({
+      orgId: session.org!.id,
+      actorId: session.profile.id,
+      action: "mailbox.connected",
+      targetType: "email_connection",
+      meta: { email: emailAddress, provider },
+    });
     return { ok: true };
   } catch (error) {
     return {
@@ -140,6 +148,14 @@ export async function disconnectMailbox(connectionId: string) {
     })
     .eq("id", connectionId)
     .eq("org_id", session.org!.id);
+  const { writeAuditEvent } = await import("@/lib/audit");
+  await writeAuditEvent({
+    orgId: session.org!.id,
+    actorId: session.profile.id,
+    action: "mailbox.disconnected",
+    targetType: "email_connection",
+    targetId: connectionId,
+  });
   revalidatePath("/dashboard/integrations");
 }
 

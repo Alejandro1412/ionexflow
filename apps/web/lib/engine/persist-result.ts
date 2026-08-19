@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notifyApprovalCreated } from "@/lib/notifications/notify";
+import { postSlackApprovalMessage } from "@/lib/approvals/slack-notify";
 import type { RunnerResult } from "@/lib/engine/runner";
+import type { FlowNode, FlowNodeData } from "@/lib/workflow/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Client = SupabaseClient<any>;
@@ -13,6 +15,7 @@ export async function persistRunnerResult(
     orgId: string;
     result: RunnerResult;
     requestedBy?: string | null;
+    workflowNodes?: FlowNode[];
   }
 ) {
   const { executionId, orgId, result, requestedBy = null } = options;
@@ -41,6 +44,19 @@ export async function persistRunnerResult(
       })
       .eq("id", executionId);
 
+    const node = options.workflowNodes?.find(
+      (n) => n.id === result.approvalNodeId
+    );
+    const nodeData = node?.data as FlowNodeData | undefined;
+    const slaMinutes = Math.max(
+      0,
+      Math.min(10080, Number(nodeData?.slaMinutes ?? 0) || 0)
+    );
+    const escalateAt =
+      slaMinutes > 0
+        ? new Date(Date.now() + slaMinutes * 60_000).toISOString()
+        : null;
+
     const { data: approval } = await supabase
       .from("approvals")
       .insert({
@@ -49,7 +65,15 @@ export async function persistRunnerResult(
         node_id: result.approvalNodeId,
         status: "pending",
         requested_by: requestedBy,
-        payload: result.approvalPayload,
+        payload: {
+          ...result.approvalPayload,
+          slaMinutes: slaMinutes || null,
+          slackWebhook:
+            nodeData?.approvalSlackWebhook?.trim() ||
+            (result.approvalPayload as { slackWebhook?: string }).slackWebhook ||
+            null,
+        },
+        escalate_at: escalateAt,
       })
       .select("id")
       .single();
@@ -68,6 +92,30 @@ export async function persistRunnerResult(
           : "Approval needed",
         agentPreview: payload.agentOutput ?? null,
       });
+
+      // Slack Approve/Reject buttons (node webhook or org default)
+      try {
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("approval_slack_webhook")
+          .eq("id", orgId)
+          .maybeSingle();
+        const webhook =
+          nodeData?.approvalSlackWebhook?.trim() ||
+          (org as { approval_slack_webhook?: string | null } | null)
+            ?.approval_slack_webhook?.trim() ||
+          null;
+        if (webhook) {
+          await postSlackApprovalMessage({
+            webhookUrl: webhook,
+            title: payload.label ?? "Approval needed",
+            preview: payload.agentOutput,
+            approvalId: approval.id,
+          });
+        }
+      } catch (error) {
+        console.error("[persist] slack approval notify", error);
+      }
     }
     return;
   }

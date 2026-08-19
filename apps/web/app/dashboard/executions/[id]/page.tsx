@@ -3,9 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/org";
 import { hasProductAccess } from "@/lib/billing";
-import { resolveApproval } from "@/actions/executions";
 import { AgentOutputPanel } from "@/components/ai/agent-output";
-import { Button } from "@/components/ui/button";
+import { ApprovalActions } from "@/components/approvals/approval-actions";
 import {
   Card,
   CardContent,
@@ -86,24 +85,10 @@ export default async function ExecutionDetailPage({
               />
             ) : null}
             <div className="flex gap-3">
-              <form
-                action={async () => {
-                  "use server";
-                  await resolveApproval(pending.id, "approved");
-                }}
-              >
-                <Button type="submit">Approve & resume</Button>
-              </form>
-              <form
-                action={async () => {
-                  "use server";
-                  await resolveApproval(pending.id, "rejected");
-                }}
-              >
-                <Button type="submit" variant="outline">
-                  Reject
-                </Button>
-              </form>
+              <ApprovalActions
+                approvalId={pending.id}
+                initialOutput={pending.payload?.agentOutput}
+              />
             </div>
           </CardContent>
         </Card>

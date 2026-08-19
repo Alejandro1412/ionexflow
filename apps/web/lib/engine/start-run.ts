@@ -76,6 +76,7 @@ export async function startWorkflowRun(
     orgId,
     result,
     requestedBy,
+    workflowNodes: nodes,
   });
 
   return {
@@ -165,6 +166,7 @@ export async function resumeWaitingExecution(
     executionId,
     orgId,
     result,
+    workflowNodes: nodes,
   });
 
   return { skipped: false as const, status: result.kind };

@@ -11,6 +11,8 @@ const NAV = [
   { href: "/dashboard/workflows", label: "Workflows" },
   { href: "/dashboard/executions", label: "Executions" },
   { href: "/dashboard/approvals", label: "Approvals" },
+  { href: "/dashboard/analytics", label: "Analytics" },
+  { href: "/dashboard/audit", label: "Audit" },
   { href: "/dashboard/notifications", label: "Notifications" },
   { href: "/dashboard/team", label: "Team" },
   { href: "/dashboard/billing", label: "Billing" },

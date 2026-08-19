@@ -14,6 +14,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     approvalId?: string;
     decision?: "approved" | "rejected";
+    editedOutput?: string | null;
   };
 
   if (!body.approvalId || (body.decision !== "approved" && body.decision !== "rejected")) {
@@ -43,6 +44,8 @@ export async function POST(request: Request) {
       approvalId: body.approvalId,
       decision: body.decision,
       reviewerId: user.id,
+      editedOutput: body.editedOutput,
+      source: "api",
     });
     return NextResponse.json(result);
   } catch (err) {

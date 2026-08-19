@@ -37,6 +37,7 @@ const TYPE_COLORS: Record<WorkflowNodeType, string> = {
   start: "border-emerald-400/60 bg-emerald-500/10",
   agent: "border-signal/50 bg-signal/10",
   classifier: "border-violet-400/60 bg-violet-500/15",
+  condition: "border-lime-400/50 bg-lime-500/10",
   approval: "border-amber-400/60 bg-amber-500/10",
   delay: "border-yellow-400/50 bg-yellow-500/10",
   http: "border-sky-400/60 bg-sky-500/10",
@@ -49,7 +50,11 @@ const TYPE_COLORS: Record<WorkflowNodeType, string> = {
 
 function WorkflowNodeView({ data, selected }: NodeProps<Node<FlowNodeData>>) {
   const routes =
-    data.type === "classifier" ? parseRoutes(data.routes) : [];
+    data.type === "classifier"
+      ? parseRoutes(data.routes)
+      : data.type === "condition"
+        ? ["true", "false"]
+        : [];
 
   return (
     <div
@@ -69,9 +74,20 @@ function WorkflowNodeView({ data, selected }: NodeProps<Node<FlowNodeData>>) {
           {[data.agentMode, data.model].filter(Boolean).join(" · ")}
         </p>
       ) : null}
-      {data.type === "classifier" ? (
+      {data.type === "classifier" || data.type === "condition" ? (
         <p className="mt-1 text-[10px] text-violet-200/90">
           routes: {routes.join(" | ")}
+        </p>
+      ) : null}
+      {data.type === "condition" ? (
+        <p className="mt-1 truncate text-[10px] text-lime-200/90">
+          {data.conditionLeft || "left"} {data.conditionOp || "eq"}{" "}
+          {data.conditionRight || "right"}
+        </p>
+      ) : null}
+      {data.type === "approval" && data.slaMinutes ? (
+        <p className="mt-1 text-[10px] text-amber-200/90">
+          SLA {data.slaMinutes}m
         </p>
       ) : null}
       {data.type === "http" || data.type === "slack" || data.type === "webhook" ? (
@@ -89,7 +105,7 @@ function WorkflowNodeView({ data, selected }: NodeProps<Node<FlowNodeData>>) {
           → {data.toTemplate || (data.type === "email_send" ? "{{from}}" : "{{to}}")}
         </p>
       ) : null}
-      {data.type === "classifier" ? (
+      {data.type === "classifier" || data.type === "condition" ? (
         routes.map((route, index) => (
           <Handle
             key={route}
@@ -204,7 +220,9 @@ export function WorkflowCanvas({
         ? "New agent"
         : type === "classifier"
           ? "AI classifier"
-          : type === "approval"
+          : type === "condition"
+            ? "Condition rule"
+            : type === "approval"
             ? "Approval gate"
             : type === "http"
               ? "HTTP request"
@@ -251,9 +269,13 @@ export function WorkflowCanvas({
             type === "agent" ? AGENT_MODE_META.general.system : undefined,
           model: type === "agent" || type === "classifier" ? "gpt-4o-mini" : undefined,
           routes: type === "classifier" ? "needs_human,auto_ok" : undefined,
+          conditionLeft: type === "condition" ? "{{trigger}}" : undefined,
+          conditionOp: type === "condition" ? "contains" : undefined,
+          conditionRight: type === "condition" ? "urgente" : undefined,
+          slaMinutes: type === "approval" ? 240 : undefined,
           message:
             type === "approval"
-              ? "Approve to continue"
+              ? "Review agent output before continuing"
               : type === "slack"
                 ? "*IonexFlow* — content ready\n\n{{agentOutput}}"
                 : undefined,
@@ -408,6 +430,9 @@ export function WorkflowCanvas({
         </Button>
         <Button type="button" variant="outline" onClick={() => addNode("classifier")}>
           + Classifier
+        </Button>
+        <Button type="button" variant="outline" onClick={() => addNode("condition")}>
+          + Condition
         </Button>
         <Button type="button" variant="outline" onClick={() => addNode("approval")}>
           + Approval
@@ -571,15 +596,103 @@ export function WorkflowCanvas({
                   </div>
                 </>
               ) : null}
+              {(selected.data as FlowNodeData).type === "condition" ? (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <Label>Left (template)</Label>
+                    <Input
+                      value={(selected.data as FlowNodeData).conditionLeft ?? ""}
+                      onChange={(e) =>
+                        updateSelectedData({ conditionLeft: e.target.value })
+                      }
+                      placeholder="{{amount}} or {{trigger}}"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label>Operator</Label>
+                    <select
+                      className="rounded-md border border-white/10 bg-black/40 px-2 py-2 text-sm"
+                      value={(selected.data as FlowNodeData).conditionOp ?? "eq"}
+                      onChange={(e) =>
+                        updateSelectedData({ conditionOp: e.target.value })
+                      }
+                    >
+                      {[
+                        "eq",
+                        "neq",
+                        "gt",
+                        "gte",
+                        "lt",
+                        "lte",
+                        "contains",
+                        "exists",
+                      ].map((op) => (
+                        <option key={op} value={op}>
+                          {op}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label>Right (template)</Label>
+                    <Input
+                      value={
+                        (selected.data as FlowNodeData).conditionRight ?? ""
+                      }
+                      onChange={(e) =>
+                        updateSelectedData({ conditionRight: e.target.value })
+                      }
+                      placeholder="1000"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Connect handles <code>true</code> / <code>false</code>. No
+                    LLM cost.
+                  </p>
+                </>
+              ) : null}
               {(selected.data as FlowNodeData).type === "approval" ? (
-                <div className="flex flex-col gap-1">
-                  <Label>Message</Label>
-                  <textarea
-                    className="min-h-[80px] rounded-md border border-white/10 bg-black/30 p-2 text-sm"
-                    value={(selected.data as FlowNodeData).message ?? ""}
-                    onChange={(e) => updateSelectedData({ message: e.target.value })}
-                  />
-                </div>
+                <>
+                  <div className="flex flex-col gap-1">
+                    <Label>Message</Label>
+                    <textarea
+                      className="min-h-[80px] rounded-md border border-white/10 bg-black/30 p-2 text-sm"
+                      value={(selected.data as FlowNodeData).message ?? ""}
+                      onChange={(e) =>
+                        updateSelectedData({ message: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label>SLA minutes (0 = off)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={10080}
+                      value={(selected.data as FlowNodeData).slaMinutes ?? 0}
+                      onChange={(e) =>
+                        updateSelectedData({
+                          slaMinutes: Number(e.target.value) || 0,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label>Slack webhook (Approve/Reject buttons)</Label>
+                    <Input
+                      value={
+                        (selected.data as FlowNodeData).approvalSlackWebhook ??
+                        ""
+                      }
+                      onChange={(e) =>
+                        updateSelectedData({
+                          approvalSlackWebhook: e.target.value,
+                        })
+                      }
+                      placeholder="https://hooks.slack.com/services/..."
+                    />
+                  </div>
+                </>
               ) : null}
               {(selected.data as FlowNodeData).type === "delay" ? (
                 <div className="flex flex-col gap-1">

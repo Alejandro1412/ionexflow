@@ -24,7 +24,14 @@ Command center B2B: diseñar y ejecutar procesos con agentes de IA + aprobacione
 | Email credentials | OK | Cifrado AES-GCM en reposo |
 | Unit tests (Vitest) | OK | grafo, crypto, rate-limit, dry-run |
 | Executions + logs AI | OK | Paneles de output |
-| Approvals web | OK | Con output del agente |
+| Approvals web | OK | Approve/Reject + **edit before approve** |
+| Approvals Slack | OK | Botones firmados vía webhook Incoming |
+| Approval SLA | OK | `slaMinutes` + cron escalation |
+| Condition node | OK | Reglas deterministicas sin LLM |
+| Fan-out outbound | OK | Varios Slack/email/HTTP en paralelo |
+| Analytics | OK | `/dashboard/analytics` (30d) |
+| Audit log | OK | `/dashboard/audit` |
+| AI overage | OK | Sigue live + `ai_overage_tokens`; aviso 80% |
 | Approvals móvil Realtime | OK | Expo + `EXPO_PUBLIC_*` |
 | Notifications in-app + email | OK | Campana + `/dashboard/notifications`; Resend opcional |
 | Nodos HTTP / Slack / Webhook | OK | Publicar tras approval; plantilla Content + publish |

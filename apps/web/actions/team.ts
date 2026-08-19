@@ -72,6 +72,15 @@ export async function createInvite(
 
     if (error) return { error: error.message };
 
+    const { writeAuditEvent } = await import("@/lib/audit");
+    await writeAuditEvent({
+      orgId: session.org!.id,
+      actorId: session.profile.id,
+      action: "invite.created",
+      targetType: "invite",
+      meta: { email: parsed.data.email, role: parsed.data.role },
+    });
+
     const origin =
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
       "http://localhost:3000";
@@ -93,6 +102,14 @@ export async function revokeInvite(inviteId: string) {
     .delete()
     .eq("id", inviteId)
     .eq("org_id", session.org!.id);
+  const { writeAuditEvent } = await import("@/lib/audit");
+  await writeAuditEvent({
+    orgId: session.org!.id,
+    actorId: session.profile.id,
+    action: "invite.revoked",
+    targetType: "invite",
+    targetId: inviteId,
+  });
   revalidatePath("/dashboard/team");
 }
 

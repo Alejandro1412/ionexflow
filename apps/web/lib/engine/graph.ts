@@ -16,3 +16,7 @@ export function nextNodeId(
   }
   return edges.find((e) => e.source === nodeId)?.target ?? null;
 }
+
+export function allOutgoing(nodeId: string, edges: FlowEdge[]): FlowEdge[] {
+  return edges.filter((e) => e.source === nodeId);
+}

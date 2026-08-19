@@ -65,6 +65,14 @@ export async function createCheckoutSession() {
   });
 
   if (!checkout.url) throw new Error("Could not create Checkout session");
+  const { writeAuditEvent } = await import("@/lib/audit");
+  await writeAuditEvent({
+    orgId: session.org.id,
+    actorId: session.profile.id,
+    action: "billing.checkout",
+    targetType: "organization",
+    targetId: session.org.id,
+  });
   redirect(checkout.url);
 }
 

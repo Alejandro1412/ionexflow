@@ -44,8 +44,16 @@ export default async function BillingPage({
   const ai = getAiRuntimeStatus();
   let quotaLabel = "—";
   try {
-    const { quota } = await getOrgQuotaSnapshot(session.org.id);
+    const { quota, org } = await getOrgQuotaSnapshot(session.org.id);
     quotaLabel = `${quota.used.toLocaleString()} / ${quota.budget.toLocaleString()} tokens (${quota.monthKey})`;
+    if ((org?.ai_overage_tokens ?? 0) > 0) {
+      quotaLabel += ` · overage ${org!.ai_overage_tokens!.toLocaleString()}`;
+    }
+    if (quota.exceeded) {
+      quotaLabel += " · overage mode (live AI continues)";
+    } else if (quota.budget > 0 && quota.used / quota.budget >= 0.8) {
+      quotaLabel += " · nearing limit";
+    }
   } catch {
     quotaLabel = "Usage tracking pending migration";
   }

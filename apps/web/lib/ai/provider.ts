@@ -245,17 +245,28 @@ export async function generateAgentOutput(input: AiGenerateInput): Promise<AiGen
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
   const preferred = process.env.IONEX_AI_PROVIDER?.trim().toLowerCase();
 
-  // Quota gate (soft degrade to demo when exceeded)
+  // Quota: warn at 80%; when exceeded keep live AI if allow_ai_overage (default), track overage — no silent demo.
+  let quotaNotice: string | undefined;
   if (input.orgId) {
     try {
       const { getOrgQuotaSnapshot } = await import("@/lib/ai/usage");
-      const { quota } = await getOrgQuotaSnapshot(input.orgId);
+      const { quota, org } = await getOrgQuotaSnapshot(input.orgId);
+      const ratio = quota.budget > 0 ? quota.used / quota.budget : 0;
+      if (!quota.exceeded && ratio >= 0.8) {
+        quotaNotice = `AI usage at ${Math.round(ratio * 100)}% of monthly quota (${quota.used.toLocaleString()}/${quota.budget.toLocaleString()}).`;
+      }
       if (quota.exceeded) {
-        const demo = spectacularDemo(input);
-        return {
-          ...demo,
-          notice: `Monthly AI quota reached (${quota.used.toLocaleString()}/${quota.budget.toLocaleString()} tokens). Upgrade or wait until next month.`,
-        };
+        const allowOverage =
+          (org as { allow_ai_overage?: boolean } | null)?.allow_ai_overage !==
+          false;
+        if (!allowOverage) {
+          const demo = spectacularDemo(input);
+          return {
+            ...demo,
+            notice: `Monthly AI quota reached (${quota.used.toLocaleString()}/${quota.budget.toLocaleString()} tokens). Overage disabled for this org.`,
+          };
+        }
+        quotaNotice = `Monthly AI quota exceeded (${quota.used.toLocaleString()}/${quota.budget.toLocaleString()}). Continuing on overage — usage is still metered.`;
       }
     } catch {
       // ignore quota lookup failures — still try live model
@@ -313,6 +324,15 @@ export async function generateAgentOutput(input: AiGenerateInput): Promise<AiGen
     } catch {
       // usage tracking must not break the run
     }
+  }
+
+  if (quotaNotice) {
+    return {
+      ...result,
+      notice: result.notice
+        ? `${quotaNotice} ${result.notice}`
+        : quotaNotice,
+    };
   }
 
   return result;

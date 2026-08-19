@@ -4,7 +4,7 @@ B2B command center for designing, running, and supervising AI agent workflows
 with human-in-the-loop approvals, automation templates, email IMAP/SMTP, and
 an in-app guide (Ionex Assistant).
 
-> **Status:** Production on Vercel + Supabase Cloud — hardening (atomic cron, encrypted mailboxes, Test run, workflow versions).  
+> **Status:** Production — Test run, versions, editable approvals, Condition, Analytics/Audit, Slack approve, SLA, encrypted mail, AI overage.  
 > **Ops docs:** [`docs/MANUAL-COMPLETO.md`](docs/MANUAL-COMPLETO.md) (paso a paso exhaustivo).
 
 ## Stack
