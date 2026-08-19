@@ -13,6 +13,7 @@ export type WorkflowNodeType =
   | "webhook"
   | "email_send"
   | "email_forward"
+  | "whatsapp_send"
   | "end";
 
 export type FlowNodeData = {
@@ -50,6 +51,11 @@ export type FlowNodeData = {
   /** Approval SLA minutes (0 = none); Slack webhook for Approve/Reject buttons */
   slaMinutes?: number;
   approvalSlackWebhook?: string;
+  /** Inject org knowledge base into agent context */
+  useOrgKnowledge?: boolean;
+  /** WhatsApp send */
+  waToTemplate?: string;
+  waBodyTemplate?: string;
 };
 
 export type FlowNode = {

@@ -20,6 +20,69 @@ export type AutomationTemplate = {
   build: () => { nodes: FlowNode[]; edges: FlowEdge[] };
 };
 
+function whatsappSupportGraph(): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const support = AGENT_MODE_META.support;
+  const nodes: FlowNode[] = [
+    {
+      id: "start-1",
+      type: "workflow",
+      position: { x: 40, y: 180 },
+      data: { label: "Start", type: "start" },
+    },
+    {
+      id: "agent-wa",
+      type: "workflow",
+      position: { x: 280, y: 180 },
+      data: {
+        label: "WhatsApp reply agent",
+        type: "agent",
+        agentMode: "support",
+        model: "gpt-4o-mini",
+        useOrgKnowledge: true,
+        prompt:
+          "Redacta una respuesta breve y empática para WhatsApp (máx. 800 caracteres) usando el mensaje del cliente y el conocimiento de la empresa.",
+        systemPrompt: support.system,
+      },
+    },
+    {
+      id: "approval-1",
+      type: "workflow",
+      position: { x: 540, y: 180 },
+      data: {
+        label: "Human approval",
+        type: "approval",
+        message: "Revisa el mensaje de WhatsApp antes de enviarlo al cliente.",
+        slaMinutes: 240,
+      },
+    },
+    {
+      id: "wa-send",
+      type: "workflow",
+      position: { x: 800, y: 180 },
+      data: {
+        label: "Send WhatsApp",
+        type: "whatsapp_send",
+        waToTemplate: "{{from}}",
+        waBodyTemplate: "{{agentOutput}}",
+        failOnError: true,
+      },
+    },
+    {
+      id: "end-1",
+      type: "workflow",
+      position: { x: 1040, y: 180 },
+      data: { label: "End", type: "end" },
+    },
+  ];
+  const edges: FlowEdge[] = [
+    { id: "e1", source: "start-1", target: "agent-wa" },
+    { id: "e2", source: "agent-wa", target: "approval-1" },
+    { id: "e3", source: "approval-1", target: "wa-send" },
+    { id: "e4", source: "wa-send", target: "end-1" },
+  ];
+  return { nodes, edges };
+}
+
 function supportTriageGraph(): { nodes: FlowNode[]; edges: FlowEdge[] } {
   const support = AGENT_MODE_META.support;
   const nodes: FlowNode[] = [
@@ -605,6 +668,16 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
     triggerHint:
       "From: cliente@acme.com | Subject: Reembolso | Body: furioso, Enterprise, downtime.",
     build: supportEmailGraph,
+  },
+  {
+    id: "whatsapp-support",
+    name: "WhatsApp support",
+    category: "Support",
+    blurb:
+      "WhatsApp entrante → agente con Knowledge → approval → respuesta WhatsApp.",
+    triggerHint:
+      "Conecta Meta Cloud API en Integrations y pega el webhook. Luego Test run.",
+    build: whatsappSupportGraph,
   },
   {
     id: "sales-qualify",

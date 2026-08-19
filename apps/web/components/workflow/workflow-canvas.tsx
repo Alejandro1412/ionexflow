@@ -45,6 +45,7 @@ const TYPE_COLORS: Record<WorkflowNodeType, string> = {
   webhook: "border-cyan-400/50 bg-cyan-500/10",
   email_send: "border-teal-400/60 bg-teal-500/10",
   email_forward: "border-orange-400/50 bg-orange-500/10",
+  whatsapp_send: "border-emerald-500/50 bg-emerald-500/10",
   end: "border-arc/50 bg-arc/10",
 };
 
@@ -104,6 +105,14 @@ function WorkflowNodeView({ data, selected }: NodeProps<Node<FlowNodeData>>) {
         <p className="mt-1 truncate text-[10px] text-teal-200/90">
           → {data.toTemplate || (data.type === "email_send" ? "{{from}}" : "{{to}}")}
         </p>
+      ) : null}
+      {data.type === "whatsapp_send" ? (
+        <p className="mt-1 truncate text-[10px] text-emerald-200/90">
+          WA → {data.waToTemplate || data.toTemplate || "{{from}}"}
+        </p>
+      ) : null}
+      {data.type === "agent" && data.useOrgKnowledge !== false ? (
+        <p className="mt-1 text-[10px] text-muted-foreground">knowledge on</p>
       ) : null}
       {data.type === "classifier" || data.type === "condition" ? (
         routes.map((route, index) => (
@@ -234,6 +243,8 @@ export function WorkflowCanvas({
                     ? "Send email reply"
                     : type === "email_forward"
                       ? "Forward / redirect"
+                      : type === "whatsapp_send"
+                        ? "WhatsApp message"
                       : type === "delay"
                         ? "Wait / delay"
                         : type === "start"
@@ -255,10 +266,15 @@ export function WorkflowCanvas({
             type === "slack" ||
             type === "webhook" ||
             type === "email_send" ||
-            type === "email_forward"
+            type === "email_forward" ||
+            type === "whatsapp_send"
               ? 2
               : undefined,
           agentMode: type === "agent" ? "general" : undefined,
+          useOrgKnowledge: type === "agent" ? true : undefined,
+          waToTemplate: type === "whatsapp_send" ? "{{from}}" : undefined,
+          waBodyTemplate:
+            type === "whatsapp_send" ? "{{agentOutput}}" : undefined,
           prompt:
             type === "agent"
               ? AGENT_MODE_META.general.defaultPrompt
@@ -455,6 +471,9 @@ export function WorkflowCanvas({
         <Button type="button" variant="outline" onClick={() => addNode("email_forward")}>
           + Forward
         </Button>
+        <Button type="button" variant="outline" onClick={() => addNode("whatsapp_send")}>
+          + WhatsApp
+        </Button>
         <Button type="button" variant="outline" onClick={onSave} disabled={saving}>
           {saving ? "Saving…" : "Save"}
         </Button>
@@ -565,6 +584,20 @@ export function WorkflowCanvas({
                       onChange={(e) => updateSelectedData({ prompt: e.target.value })}
                     />
                   </div>
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={
+                        (selected.data as FlowNodeData).useOrgKnowledge !== false
+                      }
+                      onChange={(e) =>
+                        updateSelectedData({
+                          useOrgKnowledge: e.target.checked,
+                        })
+                      }
+                    />
+                    Use company Knowledge
+                  </label>
                 </>
               ) : null}
               {(selected.data as FlowNodeData).type === "classifier" ? (
@@ -840,11 +873,43 @@ export function WorkflowCanvas({
                   </p>
                 </>
               ) : null}
+              {(selected.data as FlowNodeData).type === "whatsapp_send" ? (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <Label>To phone (template)</Label>
+                    <Input
+                      value={
+                        (selected.data as FlowNodeData).waToTemplate ??
+                        (selected.data as FlowNodeData).toTemplate ??
+                        ""
+                      }
+                      onChange={(e) =>
+                        updateSelectedData({ waToTemplate: e.target.value })
+                      }
+                      placeholder="{{from}} or 52155…"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label>Message body</Label>
+                    <textarea
+                      className="min-h-[100px] rounded-md border border-white/10 bg-black/30 p-2 text-sm"
+                      value={
+                        (selected.data as FlowNodeData).waBodyTemplate ??
+                        (selected.data as FlowNodeData).bodyEmailTemplate ??
+                        ""
+                      }
+                      onChange={(e) =>
+                        updateSelectedData({ waBodyTemplate: e.target.value })
+                      }
+                    />
+                  </div>
+                </>
+              ) : null}
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Select a node. Add <strong>Email / Forward</strong> to close
-              support threads without leaving Ionex.
+              Select a node. Add <strong>WhatsApp / Email / Knowledge</strong> for
+              real business channels.
             </p>
           )}
 

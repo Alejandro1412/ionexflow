@@ -4,11 +4,16 @@ import {
   disconnectMailbox,
   updateEmailConnectionSettings,
 } from "@/actions/email";
+import {
+  disconnectWhatsApp,
+  updateWhatsAppSettings,
+} from "@/actions/whatsapp";
 import { createWorkflowFromTemplate } from "@/actions/workflows";
 import {
   ConnectMailboxForm,
   SyncMailboxButton,
 } from "@/components/email/connect-mailbox-form";
+import { ConnectWhatsAppForm } from "@/components/whatsapp/connect-whatsapp-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,31 +43,46 @@ export default async function IntegrationsPage() {
   }
 
   const supabase = await createClient();
-  const [{ data: connections }, { data: workflows }, { data: recentMail }] =
-    await Promise.all([
-      supabase
-        .from("email_connections")
-        .select(
-          "id, provider, status, display_name, email_address, inbound_token, default_workflow_id, forward_to, last_synced_at, last_error, imap_host, smtp_host, connected_at, auto_sync"
-        )
-        .eq("org_id", session.org!.id)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("workflows")
-        .select("id, name")
-        .eq("org_id", session.org!.id)
-        .order("updated_at", { ascending: false }),
-      supabase
-        .from("email_messages")
-        .select("id, direction, from_address, subject, status, created_at")
-        .eq("org_id", session.org!.id)
-        .order("created_at", { ascending: false })
-        .limit(10),
-    ]);
+  const [
+    { data: connections },
+    { data: workflows },
+    { data: recentMail },
+    { data: waConnections },
+  ] = await Promise.all([
+    supabase
+      .from("email_connections")
+      .select(
+        "id, provider, status, display_name, email_address, inbound_token, default_workflow_id, forward_to, last_synced_at, last_error, imap_host, smtp_host, connected_at, auto_sync"
+      )
+      .eq("org_id", session.org!.id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("workflows")
+      .select("id, name")
+      .eq("org_id", session.org!.id)
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("email_messages")
+      .select("id, direction, from_address, subject, status, created_at")
+      .eq("org_id", session.org!.id)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("whatsapp_connections")
+      .select(
+        "id, status, display_name, phone_number_id, verify_token, inbound_token, default_workflow_id, last_error, connected_at"
+      )
+      .eq("org_id", session.org!.id)
+      .order("created_at", { ascending: true }),
+  ]);
 
   const active =
     (connections ?? []).find((c) => c.status === "active") ||
     (connections ?? [])[0];
+  const waActive =
+    (waConnections ?? []).find((c) => c.status === "active") ||
+    (waConnections ?? [])[0];
+  const webhookUrl = `${siteUrl()}/api/whatsapp/webhook`;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -247,6 +267,66 @@ export default async function IntegrationsPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>WhatsApp Business (Meta Cloud API)</CardTitle>
+          <CardDescription>
+            Canal principal para LATAM: mensajes entrantes disparan un workflow;
+            el nodo WhatsApp envía respuestas (idealmente tras Approval).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {waActive?.status === "active" ? (
+            <div className="space-y-3 rounded-lg border border-signal/30 bg-signal/5 p-4 text-sm">
+              <p>
+                <span className="font-semibold">{waActive.display_name}</span> ·{" "}
+                {waActive.phone_number_id}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Webhook URL: <code className="text-signal">{webhookUrl}</code>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Verify token:{" "}
+                <code className="text-signal">{waActive.verify_token}</code>
+              </p>
+              <form action={updateWhatsAppSettings} className="flex flex-wrap gap-3">
+                <input type="hidden" name="connectionId" value={waActive.id} />
+                <select
+                  name="workflowId"
+                  defaultValue={waActive.default_workflow_id ?? ""}
+                  className="rounded-md border border-white/10 bg-black/40 px-2 py-2 text-sm"
+                >
+                  <option value="">— workflow —</option>
+                  {(workflows ?? []).map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+                <Button type="submit" size="sm" variant="outline">
+                  Save routing
+                </Button>
+              </form>
+              <form
+                action={async () => {
+                  "use server";
+                  await disconnectWhatsApp(waActive.id);
+                }}
+              >
+                <Button type="submit" size="sm" variant="outline">
+                  Disconnect
+                </Button>
+              </form>
+              {waActive.last_error ? (
+                <p className="text-amber-200">{waActive.last_error}</p>
+              ) : null}
+            </div>
+          ) : (
+            <ConnectWhatsAppForm workflows={workflows ?? []} />
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

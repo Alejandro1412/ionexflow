@@ -91,6 +91,75 @@ export async function createWorkflowFromTemplate(templateId: string) {
   redirect(`/dashboard/workflows/${data.id}`);
 }
 
+export async function createWorkflowFromDescription(
+  _prev: WorkflowActionState,
+  formData: FormData
+): Promise<WorkflowActionState> {
+  const access = await requireAccess();
+  if ("error" in access) {
+    return {
+      error:
+        access.error === "upgrade_required"
+          ? "Upgrade required"
+          : "Not authenticated",
+    };
+  }
+  const description = String(formData.get("description") ?? "").trim();
+  if (!description) return { error: "Describe el proceso primero" };
+
+  try {
+    const { buildWorkflowFromDescription } = await import(
+      "@/lib/workflow/build-from-text"
+    );
+    const graph = await buildWorkflowFromDescription({
+      description,
+      orgId: access.session.org!.id,
+    });
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("workflows")
+      .insert({
+        org_id: access.session.org!.id,
+        name: graph.name,
+        nodes: graph.nodes,
+        edges: graph.edges,
+        is_active: false,
+        created_by: access.session.profile.id,
+      })
+      .select("id")
+      .single();
+
+    if (error || !data) {
+      return { error: error?.message ?? "No se pudo crear el workflow" };
+    }
+
+    const { writeAuditEvent } = await import("@/lib/audit");
+    await writeAuditEvent({
+      orgId: access.session.org!.id,
+      actorId: access.session.profile.id,
+      action: "workflow.generated_from_text",
+      targetType: "workflow",
+      targetId: data.id,
+      meta: { name: graph.name },
+    });
+
+    redirect(`/dashboard/workflows/${data.id}?generated=1`);
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "digest" in error &&
+      String((error as { digest?: string }).digest).startsWith("NEXT_REDIRECT")
+    ) {
+      throw error;
+    }
+    return {
+      error: error instanceof Error ? error.message : "No se pudo generar",
+    };
+  }
+}
+
 export async function saveWorkflow(
   workflowId: string,
   input: {

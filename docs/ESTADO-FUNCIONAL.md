@@ -1,6 +1,6 @@
 # Estado funcional
 
-Última alineación con el código (hardening: cron claim, cifrado email, Test run, versions, Vitest).  
+Última alineación con el código (WhatsApp, Knowledge, NL→workflow + business features + hardening).  
 Smoke: `pnpm --filter web test` · `node scripts/smoke-e2e.mjs`  
 Guía larga: [GUIA-DE-LA-APP.md](./GUIA-DE-LA-APP.md) · Manual paso a paso: [MANUAL-COMPLETO.md](./MANUAL-COMPLETO.md) · Deploy: [DEPLOY.md](./DEPLOY.md)
 
@@ -16,8 +16,10 @@ Command center B2B: diseñar y ejecutar procesos con agentes de IA + aprobacione
 | Signup / login email+password | OK | Org `trial` + owner automático |
 | Google OAuth | OK* | Requiere claves + redirect Supabase |
 | Dashboard overview | OK | Conteos + atajos |
-| AI Automations | OK | 5 plantillas + playbooks + AI Lab |
-| Workflows + canvas | OK | Agent, Classifier, Approval, Delay, HTTP/Slack/Email; **Save versions** + **Test run / Safe mode** |
+| AI Automations | OK | Plantillas + **Descríbelo y te lo armo** (NL→workflow inactivo) + AI Lab |
+| Knowledge | OK | `/dashboard/knowledge` — docs de texto; agentes inyectan contexto (ILIKE MVP) |
+| WhatsApp Cloud API | OK | Integrations + webhook `/api/whatsapp/webhook` + nodo `whatsapp_send` |
+| Workflows + canvas | OK | Agent (+ Knowledge), Classifier, Approval, Delay, HTTP/Slack/Email/WhatsApp; **versions** + **Test run** |
 | Motor + LLM | OK | OpenAI/Anthropic o demo; dry-run stub side effects |
 | Classifier (ramas) | OK | Rutas por handle/label |
 | Cron / delays / schedules | OK | Claim atómico + reaper de `running` stuck |

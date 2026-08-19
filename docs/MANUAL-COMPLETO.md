@@ -332,7 +332,7 @@ Header del dashboard → Sign out → limpia sesión → `/login`.
 Layout compartido (`/dashboard/*`):
 
 1. Marca / nombre de org / `plan_status`  
-2. Nav: Overview, AI Automations, Integrations, Assistant, Workflows, Executions, Approvals, Notifications, Team, Billing, Pricing  
+2. Nav: Overview, AI Automations, Integrations, Knowledge, Assistant, Workflows, Executions, Approvals, Notifications, Team, Billing, Pricing  
 3. Campana de notificaciones  
 4. Sign out  
 5. Widget flotante **Ask Ionex** (si el plan no está locked)
@@ -385,8 +385,15 @@ Plantillas típicas (ids en código):
 | `content-rewrite` | Marketing | Rewrite playbook |
 | `support-triage` | Support | Classifier → ramas |
 | `support-email` | Support | Playbook IMAP/email |
+| `whatsapp-support` | Support | WhatsApp → Agent+Knowledge → Approval → Send |
 | `sales-qualify` | Sales | Calificar lead |
 | `ops-playbook` | Ops | Checklist / ops |
+
+### 11.2b Descríbelo y te lo armo
+
+1. En Automations, escribe el proceso en español (ej. “cuando entre WhatsApp, responde con Knowledge y pide approval”).  
+2. Submit → LLM arma nodos/edges → crea workflow **`is_active: false`**.  
+3. Abre el canvas → **Test run** → ajusta → **Activate**.
 
 ### 11.3 Playbooks (solo info)
 
@@ -452,6 +459,20 @@ No crean workflows; educan para configurar Agents.
 - Credenciales incompletas → “reconnect”.  
 - IMAP fail → `status=error` + `last_error`.  
 - Sin workflow → “Link a default workflow first”.
+
+### 12.5 WhatsApp Business (Meta Cloud API)
+
+1. En Meta Developers: app + WhatsApp product → Phone Number ID + token permanente.  
+2. En Integrations → **Connect WhatsApp**: Phone Number ID, token, verify token, workflow por defecto.  
+3. Webhook Meta: `https://ionexflow.vercel.app/api/whatsapp/webhook` (GET verify + POST inbound).  
+4. Inbound texto → `startWorkflowRun` con `from` / `body`.  
+5. Nodo **WhatsApp** (`whatsapp_send`) envía con `waToTemplate` / `waBodyTemplate` (recomendado tras Approval). Dry-run no llama a Meta.
+
+### 12.6 Knowledge `/dashboard/knowledge`
+
+1. Pega documentos de texto (FAQ, políticas, playbooks).  
+2. Agents con **Use company Knowledge** (default on) inyectan chunks relevantes (keyword/ILIKE) en el system prompt.  
+3. SQL prod: `scripts/prod-migration-whatsapp-knowledge.sql` (tras business-features si aplica).
 
 ---
 

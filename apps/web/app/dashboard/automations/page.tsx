@@ -7,6 +7,7 @@ import { AGENT_MODE_META, type AgentMode } from "@/lib/ai/modes";
 import { AUTOMATION_TEMPLATES } from "@/lib/workflow/templates";
 import { createWorkflowFromTemplate } from "@/actions/workflows";
 import { AiLabForm } from "@/components/ai/ai-lab-form";
+import { BuildFromTextForm } from "@/components/workflow/build-from-text-form";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -53,6 +54,19 @@ export default async function AutomationsPage() {
         </div>
         <p className="text-sm text-muted-foreground">{ai.hint}</p>
       </div>
+
+      <Card className="border-signal/30 bg-signal/5">
+        <CardHeader>
+          <CardTitle>Descríbelo y te lo armo</CardTitle>
+          <CardDescription>
+            Explica el proceso en español. La IA genera el diagrama completo
+            (inactivo) para que lo revises con Test run antes de activarlo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BuildFromTextForm />
+        </CardContent>
+      </Card>
 
       <section className="space-y-4">
         <div>

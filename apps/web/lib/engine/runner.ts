@@ -302,6 +302,100 @@ async function runOutboundNode(options: {
   }
 }
 
+async function runWhatsAppNode(options: {
+  node: FlowNode;
+  data: FlowNodeData;
+  logs: ExecutionLogEntry[];
+  context: Record<string, string>;
+  triggerPayload: Record<string, unknown>;
+  dryRun?: boolean;
+}): Promise<"ok" | { error: string }> {
+  const { node, data, logs, context, triggerPayload, dryRun } = options;
+  const vars = templateVars(data, logs, context, triggerPayload);
+  const failOnError = data.failOnError !== false;
+  const to = renderTemplate(
+    data.waToTemplate?.trim() || data.toTemplate?.trim() || "{{from}}",
+    vars
+  ).trim();
+  const text = renderTemplate(
+    data.waBodyTemplate?.trim() ||
+      data.bodyEmailTemplate?.trim() ||
+      "{{agentOutput}}",
+    vars
+  );
+
+  if (!to) {
+    const message = `whatsapp_send "${data.label}" has no recipient`;
+    logs.push(log(node.id, message, "error"));
+    return { error: message };
+  }
+
+  if (dryRun) {
+    const summary = `[dry-run] would WhatsApp → ${to}`;
+    context[data.label] = summary;
+    logs.push(
+      log(node.id, summary, "warn", {
+        kind: "email_output",
+        output: text,
+        provider: "dry-run",
+      })
+    );
+    return "ok";
+  }
+
+  logs.push(log(node.id, `Sending WhatsApp to ${to}…`));
+
+  try {
+    const { createServiceRoleClient } = await import("@/lib/supabase/server");
+    const {
+      rowToWhatsAppCredentials,
+      sendWhatsAppText,
+    } = await import("@/lib/whatsapp/cloud");
+    const admin = createServiceRoleClient();
+    const orgId = String(triggerPayload.orgId ?? "");
+    const connectionId = triggerPayload.whatsappConnectionId
+      ? String(triggerPayload.whatsappConnectionId)
+      : null;
+
+    let query = admin
+      .from("whatsapp_connections")
+      .select("*")
+      .eq("org_id", orgId)
+      .eq("status", "active");
+    if (connectionId) query = query.eq("id", connectionId);
+    const { data: row } = await query
+      .order("connected_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const credentials = row ? rowToWhatsAppCredentials(row) : null;
+    if (!credentials) {
+      const message = "No active WhatsApp connection — connect in Integrations";
+      logs.push(log(node.id, message, "error"));
+      return failOnError ? { error: message } : "ok";
+    }
+
+    const result = await sendWhatsAppText({ credentials, to, text });
+    const summary = result.ok
+      ? `WhatsApp sent (${result.id ?? "ok"}) → ${to}`
+      : result.error ?? "WhatsApp failed";
+    context[data.label] = summary;
+    logs.push(
+      log(node.id, summary, result.ok ? "success" : "error", {
+        kind: "email_output",
+        output: text,
+        provider: "whatsapp",
+      })
+    );
+    if (!result.ok && failOnError) return { error: result.error ?? "WhatsApp failed" };
+    return "ok";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "WhatsApp failed";
+    logs.push(log(node.id, message, "error"));
+    return { error: message };
+  }
+}
+
 /**
  * After a node completes: if multiple unlabeled outgoing edges target
  * outbound nodes (http/slack/webhook/email), run them in parallel (fan-out),
@@ -332,6 +426,7 @@ async function advanceAfterNode(options: {
     "webhook",
     "email_send",
     "email_forward",
+    "whatsapp_send",
   ]);
   const allOutbound = targets.every((t) =>
     outboundTypes.has(getData(t).type)
@@ -367,6 +462,16 @@ async function advanceAfterNode(options: {
           context,
           triggerPayload,
           mode: td.type,
+          dryRun,
+        });
+      }
+      if (td.type === "whatsapp_send") {
+        return runWhatsAppNode({
+          node: target,
+          data: td,
+          logs,
+          context,
+          triggerPayload,
           dryRun,
         });
       }
@@ -509,6 +614,36 @@ export async function runWorkflowGraph(options: {
           log(node.id, `Agent "${data.label}" [${mode}] invoking intelligence…`)
         );
 
+        let systemPrompt = data.systemPrompt;
+        const agentContext = { ...context };
+        if (data.useOrgKnowledge !== false && orgId) {
+          try {
+            const {
+              retrieveOrgKnowledge,
+              formatKnowledgeForPrompt,
+            } = await import("@/lib/knowledge/retrieve");
+            const chunks = await retrieveOrgKnowledge({
+              orgId,
+              query: `${prompt}\n${String(triggerPayload.input ?? "")}`,
+              limit: 5,
+            });
+            const block = formatKnowledgeForPrompt(chunks);
+            if (block) {
+              agentContext.__orgKnowledge = block;
+              systemPrompt = `${systemPrompt ?? "You are an IonexFlow business agent."}\n\nUse ONLY the following company knowledge when relevant. If it does not apply, say so briefly.\n\n${block}`;
+              logs.push(
+                log(
+                  node.id,
+                  `Loaded ${chunks.length} org knowledge doc(s)`,
+                  "info"
+                )
+              );
+            }
+          } catch {
+            // knowledge is optional
+          }
+        }
+
         try {
           let lastError: unknown;
           let result: Awaited<ReturnType<typeof generateWithMode>> | null = null;
@@ -528,11 +663,11 @@ export async function runWorkflowGraph(options: {
                 agentLabel: data.label,
                 prompt,
                 mode,
-                systemPrompt: data.systemPrompt,
+                systemPrompt,
                 model: data.model,
                 temperature: data.temperature,
                 triggerPayload,
-                context,
+                context: agentContext,
                 orgId,
                 source: "agent",
               });
@@ -778,6 +913,51 @@ export async function runWorkflowGraph(options: {
         );
         if (mail !== "ok") {
           return { kind: "failed", logs, error: mail.error };
+        }
+        {
+          const adv = await advanceAfterNode({
+            nodeId: node.id,
+            edges,
+            byId,
+            logs,
+            context,
+            triggerPayload,
+            dryRun,
+          });
+          if (adv.error) {
+            return { kind: "failed", logs, error: adv.error };
+          }
+          currentId = adv.nextId;
+        }
+        break;
+      }
+      case "whatsapp_send": {
+        const maxAttempts = (data.maxRetries ?? 2) + 1;
+        const wa = await withRetries(
+          maxAttempts,
+          async (attempt) => {
+            if (attempt > 1) {
+              logs.push(
+                log(
+                  node.id,
+                  `whatsapp_send retry ${attempt}/${maxAttempts}…`,
+                  "warn"
+                )
+              );
+            }
+            return runWhatsAppNode({
+              node,
+              data,
+              logs,
+              context,
+              triggerPayload,
+              dryRun,
+            });
+          },
+          (value) => value === "ok"
+        );
+        if (wa !== "ok") {
+          return { kind: "failed", logs, error: wa.error };
         }
         {
           const adv = await advanceAfterNode({

@@ -11,6 +11,7 @@ const PUBLIC_PATHS = [
   "/api/approvals",
   "/api/cron",
   "/api/email",
+  "/api/whatsapp",
 ];
 
 function isPublicPath(pathname: string) {
