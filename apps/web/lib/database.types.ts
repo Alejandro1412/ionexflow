@@ -35,6 +35,8 @@ export interface Database {
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
           plan_status: PlanStatus;
+          ai_tokens_used_month: number;
+          ai_usage_month: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -44,6 +46,8 @@ export interface Database {
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           plan_status?: PlanStatus;
+          ai_tokens_used_month?: number;
+          ai_usage_month?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -53,6 +57,8 @@ export interface Database {
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           plan_status?: PlanStatus;
+          ai_tokens_used_month?: number;
+          ai_usage_month?: string | null;
           created_at?: string;
           updated_at?: string;
         };

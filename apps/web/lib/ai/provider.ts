@@ -150,6 +150,11 @@ async function generateOpenAI(input: AiGenerateInput, apiKey: string): Promise<A
 
   const json = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
   };
   const text = json.choices?.[0]?.message?.content?.trim();
   if (!text) throw new Error("OpenAI returned an empty response");
@@ -165,6 +170,9 @@ async function generateOpenAI(input: AiGenerateInput, apiKey: string): Promise<A
     model,
     latencyMs: Date.now() - started,
     demo: false,
+    promptTokens: json.usage?.prompt_tokens,
+    completionTokens: json.usage?.completion_tokens,
+    totalTokens: json.usage?.total_tokens,
   };
 }
 
@@ -195,6 +203,10 @@ async function generateAnthropic(input: AiGenerateInput, apiKey: string): Promis
 
   const json = (await res.json()) as {
     content?: Array<{ type?: string; text?: string }>;
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+    };
   };
   const text = json.content?.find((c) => c.type === "text")?.text?.trim();
   if (!text) throw new Error("Anthropic returned an empty response");
@@ -203,13 +215,22 @@ async function generateAnthropic(input: AiGenerateInput, apiKey: string): Promis
     ? normalizeRoute(text, input.classifyRoutes)
     : undefined;
 
+  const promptTokens = json.usage?.input_tokens;
+  const completionTokens = json.usage?.output_tokens;
+
   return {
     text: route ?? text,
     route,
-    provider: "anthropic",
+    provider: "anthropic" as const,
     model,
     latencyMs: Date.now() - started,
     demo: false,
+    promptTokens,
+    completionTokens,
+    totalTokens:
+      promptTokens != null && completionTokens != null
+        ? promptTokens + completionTokens
+        : undefined,
   };
 }
 
@@ -224,12 +245,77 @@ export async function generateAgentOutput(input: AiGenerateInput): Promise<AiGen
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
   const preferred = process.env.IONEX_AI_PROVIDER?.trim().toLowerCase();
 
-  if (preferred === "demo") return spectacularDemo(input);
-  if (preferred === "anthropic" && anthropicKey) return generateAnthropic(input, anthropicKey);
-  if (preferred === "openai" && openaiKey) return generateOpenAI(input, openaiKey);
-  if (openaiKey) return generateOpenAI(input, openaiKey);
-  if (anthropicKey) return generateAnthropic(input, anthropicKey);
-  return spectacularDemo(input);
+  // Quota gate (soft degrade to demo when exceeded)
+  if (input.orgId) {
+    try {
+      const { getOrgQuotaSnapshot } = await import("@/lib/ai/usage");
+      const { quota } = await getOrgQuotaSnapshot(input.orgId);
+      if (quota.exceeded) {
+        const demo = spectacularDemo(input);
+        return {
+          ...demo,
+          notice: `Monthly AI quota reached (${quota.used.toLocaleString()}/${quota.budget.toLocaleString()} tokens). Upgrade or wait until next month.`,
+        };
+      }
+    } catch {
+      // ignore quota lookup failures — still try live model
+    }
+  }
+
+  async function runLive(): Promise<AiGenerateResult> {
+    if (preferred === "demo") return spectacularDemo(input);
+    if (preferred === "anthropic" && anthropicKey) {
+      return generateAnthropic(input, anthropicKey);
+    }
+    if (preferred === "openai" && openaiKey) {
+      return generateOpenAI(input, openaiKey);
+    }
+    if (openaiKey) return generateOpenAI(input, openaiKey);
+    if (anthropicKey) return generateAnthropic(input, anthropicKey);
+    return spectacularDemo(input);
+  }
+
+  let result: AiGenerateResult;
+  try {
+    result = await runLive();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const rateLimited = /429|quota|rate.?limit|billing/i.test(message);
+    if (rateLimited) {
+      const demo = spectacularDemo(input);
+      return {
+        ...demo,
+        notice:
+          "Live LLM rate-limited (429). Fell back to demo intelligence for this step.",
+      };
+    }
+    throw error;
+  }
+
+  if (input.orgId && !result.demo) {
+    try {
+      const { estimateTokensFromText } = await import("@/lib/ai/quotas");
+      const { recordAiUsage } = await import("@/lib/ai/usage");
+      const promptTokens =
+        result.promptTokens ??
+        estimateTokensFromText(input.prompt, input.systemPrompt ?? "");
+      const completionTokens =
+        result.completionTokens ?? estimateTokensFromText(result.text);
+      await recordAiUsage({
+        orgId: input.orgId,
+        source: input.source ?? (input.classifyRoutes ? "classifier" : "agent"),
+        provider: result.provider,
+        model: result.model,
+        promptTokens,
+        completionTokens,
+        meta: { agentLabel: input.agentLabel },
+      });
+    } catch {
+      // usage tracking must not break the run
+    }
+  }
+
+  return result;
 }
 
 export async function generateWithMode(

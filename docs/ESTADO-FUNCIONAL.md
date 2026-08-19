@@ -2,7 +2,7 @@
 
 Última alineación con el código (auth, canvas, LLM, automations, assistant, móvil, billing stub).  
 Smoke: `node scripts/smoke-e2e.mjs`  
-Guía larga: [GUIA-DE-LA-APP.md](./GUIA-DE-LA-APP.md)
+Guía larga: [GUIA-DE-LA-APP.md](./GUIA-DE-LA-APP.md) · Manual paso a paso: [MANUAL-COMPLETO.md](./MANUAL-COMPLETO.md)
 
 ## Para qué es
 
@@ -45,7 +45,9 @@ Command center B2B: diseñar y ejecutar procesos con agentes de IA + aprobacione
 | Jobs/colas + retries LLM en engine | OK* | Cron `/api/cron/tick` + retries agent/http/email; *requires CRON_SECRET |
 | Delay node + schedules | OK | Nodo delay + schedule every N min + email auto-sync |
 | Paralelismo / versiones | No | Orquestación avanzada |
-| Cuotas tokens por plan | No | Control de coste |
+| Cuotas tokens por plan | OK | Trial 50k / Active 500k; soft fallback a demo |
+| Fallback 429 en Agent | OK | Degrada a demo con aviso en logs |
+| Streaming UI | No | Outputs al completar el nodo |
 | SSO / audit export | No | Enterprise |
 
 ## Configuración externa
@@ -69,4 +71,6 @@ Command center B2B: diseñar y ejecutar procesos con agentes de IA + aprobacione
 ## Docs
 
 - [GUIA-DE-LA-APP.md](./GUIA-DE-LA-APP.md) — explicación minuciosa  
+- [MANUAL-COMPLETO.md](./MANUAL-COMPLETO.md) — guía paso a paso de toda la app  
 - [PLAN-SIGUIENTE.md](./PLAN-SIGUIENTE.md) — roadmap por fases
+- [DEPLOY.md](./DEPLOY.md) — producción Vercel/Supabase/Stripe

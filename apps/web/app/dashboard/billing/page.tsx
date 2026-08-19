@@ -7,6 +7,8 @@ import {
   isStripeWebhookConfigured,
   stripeConfigIssues,
 } from "@/lib/billing";
+import { getOrgQuotaSnapshot } from "@/lib/ai/usage";
+import { getAiRuntimeStatus } from "@/lib/ai/status";
 import {
   activateProDev,
   createBillingPortalSession,
@@ -39,6 +41,14 @@ export default async function BillingPage({
   const bypassAllowed = isDevBillingBypassAllowed();
   const webhookReady = isStripeWebhookConfigured();
   const missing = stripeConfigIssues();
+  const ai = getAiRuntimeStatus();
+  let quotaLabel = "—";
+  try {
+    const { quota } = await getOrgQuotaSnapshot(session.org.id);
+    quotaLabel = `${quota.used.toLocaleString()} / ${quota.budget.toLocaleString()} tokens (${quota.monthKey})`;
+  } catch {
+    quotaLabel = "Usage tracking pending migration";
+  }
 
   let syncNote: string | null = null;
   if (searchParams.checkout === "success" && searchParams.session_id) {
@@ -98,6 +108,21 @@ export default async function BillingPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
+          <div className="rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm">
+            <p>
+              <span className="text-muted-foreground">AI runtime:</span>{" "}
+              <strong>{ai.label}</strong>
+            </p>
+            <p className="mt-1 text-muted-foreground">{ai.hint}</p>
+            <p className="mt-2">
+              <span className="text-muted-foreground">Monthly tokens:</span>{" "}
+              <strong>{quotaLabel}</strong>
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Trial ≈ 50k tokens/month · Active ≈ 500k. Over quota soft-falls back to
+              demo intelligence.
+            </p>
+          </div>
           {stripeReady ? (
             <>
               {!webhookReady ? (

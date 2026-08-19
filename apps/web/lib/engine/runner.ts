@@ -298,6 +298,8 @@ export async function runWorkflowGraph(options: {
   const logs = [...existingLogs];
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const context: Record<string, string> = {};
+  const orgId =
+    typeof triggerPayload.orgId === "string" ? triggerPayload.orgId : undefined;
 
   for (const entry of existingLogs) {
     if (
@@ -376,6 +378,8 @@ export async function runWorkflowGraph(options: {
                 temperature: data.temperature,
                 triggerPayload,
                 context,
+                orgId,
+                source: "agent",
               });
               lastError = null;
               break;
@@ -391,6 +395,9 @@ export async function runWorkflowGraph(options: {
 
           context[data.label] = result.text;
           const modeLabel = result.demo ? "demo intelligence" : result.provider;
+          if (result.notice) {
+            logs.push(log(node.id, result.notice, "warn"));
+          }
           logs.push(
             log(
               node.id,
@@ -438,10 +445,15 @@ export async function runWorkflowGraph(options: {
             triggerPayload,
             context,
             classifyRoutes: routes,
+            orgId,
+            source: "classifier",
           });
 
           const route = result.route ?? routes[0]!;
           context[data.label] = `route=${route}`;
+          if (result.notice) {
+            logs.push(log(node.id, result.notice, "warn"));
+          }
           logs.push(
             log(
               node.id,

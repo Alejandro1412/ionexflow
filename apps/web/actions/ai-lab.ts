@@ -39,9 +39,13 @@ export async function runAiLab(
         source: "ai-lab",
       },
       context: {},
+      orgId: session.org.id,
+      source: "ai-lab",
     });
     return {
-      output: result.text,
+      output: result.notice
+        ? `${result.text}\n\n---\n_${result.notice}_`
+        : result.text,
       model: result.model,
       provider: result.provider,
       latencyMs: result.latencyMs,

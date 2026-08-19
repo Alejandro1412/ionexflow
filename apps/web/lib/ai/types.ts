@@ -10,6 +10,9 @@ export type AiGenerateInput = {
   context: Record<string, string>;
   /** Optional instruction for classifiers: return only a route key */
   classifyRoutes?: string[];
+  /** When set, enforces org quota and records usage */
+  orgId?: string;
+  source?: string;
 };
 
 export type AiGenerateResult = {
@@ -20,6 +23,11 @@ export type AiGenerateResult = {
   demo: boolean;
   /** When classifyRoutes was set */
   route?: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  /** Soft-degrade notice (quota / 429) */
+  notice?: string;
 };
 
 export const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
