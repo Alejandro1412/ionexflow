@@ -8,8 +8,10 @@ import type { FlowEdge, FlowNode } from "@/lib/workflow/types";
 
 export default async function WorkflowEditorPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams?: { generated?: string };
 }) {
   const session = await getSessionProfile();
   if (!session?.org) redirect("/login");
@@ -49,6 +51,7 @@ export default async function WorkflowEditorPage({
       }
       initialVersions={versions ?? []}
       aiStatus={{ live: ai.live, label: ai.label, hint: ai.hint }}
+      generatedFromText={searchParams?.generated === "1"}
     />
   );
 }

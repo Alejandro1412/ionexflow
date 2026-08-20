@@ -155,6 +155,7 @@ export function WorkflowCanvas({
   initialScheduleEveryMinutes = 60,
   initialVersions = [],
   aiStatus,
+  generatedFromText = false,
 }: {
   workflowId: string;
   initialName: string;
@@ -170,6 +171,7 @@ export function WorkflowCanvas({
     created_at: string;
   }>;
   aiStatus?: { live: boolean; label: string; hint: string };
+  generatedFromText?: boolean;
 }) {
   const [name, setName] = useState(initialName);
   const [isActive, setIsActive] = useState(initialActive);
@@ -187,7 +189,11 @@ export function WorkflowCanvas({
       markerEnd: { type: MarkerType.ArrowClosed, color: "#3DFFF2" },
     }))
   );
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(
+    generatedFromText
+      ? "Generado con IA (borrador inactivo). Revisa nodos → Test run → Activa cuando esté listo."
+      : null
+  );
   const [trigger, setTrigger] = useState(
     "Cliente SaaS B2B — brief real para automatizar con IA"
   );
@@ -421,6 +427,18 @@ export function WorkflowCanvas({
 
   return (
     <div className="flex h-[calc(100vh-7.5rem)] flex-col gap-3">
+      {generatedFromText ? (
+        <div className="rounded-lg border border-signal/40 bg-signal/10 px-4 py-3 text-sm">
+          <p className="font-semibold text-signal">
+            Diagrama generado desde tu descripción
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            Está <strong>inactivo</strong>. Revisa nodos y plantillas (email al
+            jefe, respuesta al cliente), haz <strong>Test run</strong>, y activa
+            cuando esté listo. También puedes seguir editando a mano.
+          </p>
+        </div>
+      ) : null}
       {aiStatus ? (
         <div
           className={`rounded-lg border px-4 py-2 text-sm ${

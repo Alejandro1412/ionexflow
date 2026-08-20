@@ -31,6 +31,7 @@ type Props = {
     created_at: string;
   }>;
   aiStatus?: { live: boolean; label: string; hint: string };
+  generatedFromText?: boolean;
 };
 
 export function WorkflowCanvasLazy(props: Props) {

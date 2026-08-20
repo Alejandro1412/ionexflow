@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/org";
 import { hasProductAccess } from "@/lib/billing";
 import { createWorkflow, deleteWorkflow } from "@/actions/workflows";
+import { BuildFromTextForm } from "@/components/workflow/build-from-text-form";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,7 +17,9 @@ import {
 export default async function WorkflowsPage() {
   const session = await getSessionProfile();
   if (!session?.org) redirect("/login");
-  if (!hasProductAccess(session.org.plan_status)) redirect("/dashboard/billing?paywall=1");
+  if (!hasProductAccess(session.org.plan_status)) {
+    redirect("/dashboard/billing?paywall=1");
+  }
 
   const supabase = await createClient();
   const { data: workflows } = await supabase
@@ -26,25 +29,47 @@ export default async function WorkflowsPage() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-bold glow-text">Workflows</h1>
+          <h1 className="font-display text-3xl font-bold glow-text">
+            Workflows
+          </h1>
           <p className="text-muted-foreground">
-            Visual agent graphs — Research → Draft → Approval with live LLM (or demo intelligence).
+            Ármalos a mano en el canvas, o descríbelos en español y la IA
+            construye el diagrama por ti.
           </p>
         </div>
         <form action={createWorkflow}>
-          <Button type="submit">New workflow</Button>
+          <Button type="submit" variant="outline">
+            Nuevo en blanco (manual)
+          </Button>
         </form>
       </div>
 
+      <Card className="border-signal/40 bg-signal/5">
+        <CardHeader>
+          <CardTitle>Descríbelo y te lo armo</CardTitle>
+          <CardDescription>
+            Escribe el proceso como se lo explicarías a un colega. La IA genera
+            el grafo completo (borrador inactivo) listo para revisar, Test run y
+            activar. También está en AI Automations.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BuildFromTextForm />
+        </CardContent>
+      </Card>
+
       <div className="grid gap-3">
+        <h2 className="font-display text-xl font-semibold">Tus workflows</h2>
         {(workflows ?? []).length === 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle>No workflows yet</CardTitle>
+              <CardTitle>Aún no hay workflows</CardTitle>
               <CardDescription>
-                Create one to get Research → Draft copy → Director approval → End.
+                Usa el cuadro de arriba para generar uno con IA, o{" "}
+                <span className="text-foreground">Nuevo en blanco</span> para
+                arrastrar nodos a mano.
               </CardDescription>
             </CardHeader>
           </Card>

@@ -83,13 +83,17 @@ Tipos de nodo permitidos: ${ALLOWED.join(", ")}.
 Reglas:
 - Debe haber exactamente un nodo start y al menos un end.
 - Usa agent para IA, approval para revisión humana, condition para reglas sin IA (handles true/false), classifier para rutas LLM.
-- Para WhatsApp usa whatsapp_send; para correo email_send / email_forward; Slack usa slack con url placeholder.
+- Correo entrante: el trigger ya trae from/subject/body. Responder al cliente = email_send (toTemplate "{{from}}"). Avisar a un jefe/interno = email_forward o slack (toTemplate con placeholder tipo "{{to}}" o un email ejemplo jefe@empresa.com).
+- WhatsApp: whatsapp_send. Slack: slack con url placeholder.
 - Condition: data.conditionLeft, conditionOp, conditionRight y edges con sourceHandle "true"/"false".
-- Agent: incluye prompt y systemPrompt en español orientados al caso.
+- Agent: incluye prompt y systemPrompt en español orientados al caso (empatía, tono, Knowledge).
+- Si el usuario pide responder a cliente: approval ANTES del email_send/whatsapp_send.
+- Si pide avisar a jefe + responder cliente: puedes fan-out (dos edges desde approval) o secuencia agent → approval → email_send + email_forward/slack.
 - Approval: slaMinutes opcional (ej. 240).
 - Posiciones: layout horizontal (x aumenta ~220 por columna).
 - No inventes secretos reales; URLs de ejemplo ok.
-- Preferir HITL (approval) antes de enviar mensajes a clientes.`,
+- Preferir HITL (approval) antes de enviar mensajes a clientes.
+- Nombre del proceso corto y en español.`,
     prompt: `Diseña el workflow para este proceso de negocio:\n\n${description}`,
     triggerPayload: { input: description },
     context: {},
