@@ -1,8 +1,8 @@
 # Estado funcional
 
-Última alineación con el código (WhatsApp, Knowledge, NL→workflow + business features + hardening).  
+Última alineación con el código (WhatsApp in/out + Knowledge v2 + NL + Monitors + Voice + Insights).  
 Smoke: `pnpm --filter web test` · `node scripts/smoke-e2e.mjs`  
-Guía larga: [GUIA-DE-LA-APP.md](./GUIA-DE-LA-APP.md) · Manual paso a paso: [MANUAL-COMPLETO.md](./MANUAL-COMPLETO.md) · Deploy: [DEPLOY.md](./DEPLOY.md)
+Guía: [GUIA-DE-LA-APP.md](./GUIA-DE-LA-APP.md) · Manual: [MANUAL-COMPLETO.md](./MANUAL-COMPLETO.md) · Deploy: [DEPLOY.md](./DEPLOY.md)
 
 ## Para qué es
 
@@ -24,8 +24,8 @@ Command center B2B: diseñar y ejecutar procesos con agentes de IA + aprobacione
 | Browser agent node | OK | Simulate o `BROWSER_WORKER_URL` |
 | Document extract node | OK | LLM extract de `{{body}}` / plantilla |
 | Industry templates | OK | Inmobiliaria, Legal, Clínica, Restaurante |
-| WhatsApp Cloud API | OK | Integrations + webhook `/api/whatsapp/webhook` + nodo `whatsapp_send` |
-| Workflows + canvas | OK | Agent (+ Knowledge), Classifier, Approval, Delay, HTTP/Slack/Email/WhatsApp; **versions** + **Test run** |
+| WhatsApp Cloud API | OK | Integrations + webhook in/out texto; Approval recomendado antes de send; plantilla support |
+| Workflows + canvas | OK | Agent (+ Knowledge), Classifier, Approval, Delay, Condition, HTTP/Slack/Email/WhatsApp/Browser/Extract; versions + Test run |
 | Motor + LLM | OK | OpenAI/Anthropic o demo; dry-run stub side effects |
 | Classifier (ramas) | OK | Rutas por handle/label |
 | Cron / delays / schedules | OK | Claim atómico + reaper de `running` stuck |
@@ -72,23 +72,28 @@ Command center B2B: diseñar y ejecutar procesos con agentes de IA + aprobacione
 
 | Ítem | Dónde |
 |------|--------|
-| LLM live | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` en `apps/web/.env.local` |
-| Email de approvals | `RESEND_API_KEY` (+ opcional `RESEND_FROM`) |
-| Google OAuth | Google Cloud + `.env` raíz + `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true` |
+| LLM live | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` |
+| Email approvals | `RESEND_API_KEY` (+ opcional `RESEND_FROM`) |
+| Google OAuth | Google Cloud + `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true` |
 | Stripe | Keys + webhook → `/api/stripe/webhook` |
+| Cron | `CRON_SECRET` → `/api/cron/tick` |
+| WhatsApp verify (opcional) | `WHATSAPP_VERIFY_TOKEN` o token por conexión en Integrations |
+| Voice | Token en Integrations (`/api/voice/webhook?token=…`) |
+| Browser worker | `BROWSER_WORKER_URL` (+ secret opcional) |
 | Móvil físico | `EXPO_PUBLIC_API_URL` = IP LAN |
 
 ## Ruta feliz de prueba
 
 1. Signup.  
-2. **AI Automations** → Content marketing.  
-3. Brief real → **Run**.  
-4. **Approvals** → Approve.  
-5. Ver **Executions**.  
+2. **Knowledge** → plantillas o PDF de políticas.  
+3. **Integrations** → WhatsApp o email.  
+4. **Workflows** → “Descríbelo…” o plantilla WhatsApp support.  
+5. Test run → **Approvals** → Activate.  
+6. Mensaje real de prueba.
 
 ## Docs
 
-- [GUIA-DE-LA-APP.md](./GUIA-DE-LA-APP.md) — explicación minuciosa  
-- [MANUAL-COMPLETO.md](./MANUAL-COMPLETO.md) — guía paso a paso de toda la app  
-- [PLAN-SIGUIENTE.md](./PLAN-SIGUIENTE.md) — roadmap por fases
-- [DEPLOY.md](./DEPLOY.md) — producción Vercel/Supabase/Stripe
+- [GUIA-DE-LA-APP.md](./GUIA-DE-LA-APP.md)  
+- [MANUAL-COMPLETO.md](./MANUAL-COMPLETO.md)  
+- [DEPLOY.md](./DEPLOY.md)  
+- [PLAN-SIGUIENTE.md](./PLAN-SIGUIENTE.md)

@@ -332,7 +332,7 @@ Header del dashboard → Sign out → limpia sesión → `/login`.
 Layout compartido (`/dashboard/*`):
 
 1. Marca / nombre de org / `plan_status`  
-2. Nav: Overview, AI Automations, Integrations, Knowledge, Assistant, Workflows, Executions, Approvals, Notifications, Team, Billing, Pricing  
+2. Nav: Overview, AI Automations, Integrations, Knowledge, Monitors, Insights, Assistant, Workflows, Executions, Approvals, Analytics, Audit, Notifications, Team, Billing, Pricing  
 3. Campana de notificaciones  
 4. Sign out  
 5. Widget flotante **Ask Ionex** (si el plan no está locked)
@@ -460,19 +460,46 @@ No crean workflows; educan para configurar Agents.
 - IMAP fail → `status=error` + `last_error`.  
 - Sin workflow → “Link a default workflow first”.
 
-### 12.5 WhatsApp Business (Meta Cloud API)
+### 12.5 WhatsApp Business (Meta Cloud API) — canal LATAM
 
-1. En Meta Developers: app + WhatsApp product → Phone Number ID + token permanente.  
-2. En Integrations → **Connect WhatsApp**: Phone Number ID, token, verify token, workflow por defecto.  
-3. Webhook Meta: `https://ionexflow.vercel.app/api/whatsapp/webhook` (GET verify + POST inbound).  
-4. Inbound texto → `startWorkflowRun` con `from` / `body`.  
-5. Nodo **WhatsApp** (`whatsapp_send`) envía con `waToTemplate` / `waBodyTemplate` (recomendado tras Approval). Dry-run no llama a Meta.
+**Entrada + salida** (no solo correo).
 
-### 12.6 Knowledge `/dashboard/knowledge`
+1. Meta Developers → app + producto WhatsApp → **Phone Number ID** + token permanente.  
+2. Ionex **Integrations** → Connect WhatsApp: Phone Number ID, token, verify token, workflow por defecto.  
+3. En Meta → Webhooks:  
+   - Callback URL: `https://ionexflow.vercel.app/api/whatsapp/webhook`  
+   - Verify token: el de la conexión (o `WHATSAPP_VERIFY_TOKEN` en Vercel)  
+   - Suscribir `messages`  
+4. Mensaje de texto entrante → se guarda en `whatsapp_messages` → `startWorkflowRun` (`channel: whatsapp`, `from`, `body`).  
+5. Nodo canvas **WhatsApp** (`whatsapp_send`): `waToTemplate` (ej. `{{from}}`) + `waBodyTemplate` (ej. `{{agentOutput}}`).  
+6. **Patrón recomendado:** Agent (+ Knowledge) → **Approval** → WhatsApp send. Plantilla *WhatsApp support* ya viene así.  
+7. Test run / Safe mode **no** llama a Meta; live sí. Outbound exitoso también se audita en `whatsapp_messages`.  
+8. SQL: `scripts/prod-migration-whatsapp-knowledge.sql`.
 
-1. Pega documentos de texto (FAQ, políticas, playbooks).  
-2. Agents con **Use company Knowledge** (default on) inyectan chunks relevantes (keyword/ILIKE) en el system prompt.  
-3. SQL prod: `scripts/prod-migration-whatsapp-knowledge.sql` (tras business-features si aplica).
+**Límite actual:** texto (ventana conversación Meta). Sin media / HSM templates todavía.
+
+### 12.6 Knowledge `/dashboard/knowledge` (v2)
+
+1. Sube `.pdf` / `.txt` / `.md` o pega texto; elige tipo (policy, catalog, faq…).  
+2. Se indexa en `knowledge_chunks`; Agents rankean por relevancia.  
+3. Si el trigger trae `from`, también inyecta historial email/WhatsApp de ese cliente.  
+4. Plantillas starter + botón **Reindexar chunks**.  
+5. SQL: `scripts/prod-migration-whatsapp-knowledge.sql` + `scripts/prod-migration-knowledge-v2.sql`.
+
+### 12.7 Voice inbound
+
+1. Integrations → Enable voice + workflow.  
+2. POST `https://ionexflow.vercel.app/api/voice/webhook?token=<inbound_token>` con `transcript` / Twilio `SpeechResult` + `From`.  
+3. Dispara el mismo motor de workflows.
+
+### 12.8 Monitors `/dashboard/monitors`
+
+Umbral (métrica manual, fallos de ejecución, rechazos) → cron `claim_due_monitors` → `startWorkflowRun`.  
+SQL: `scripts/prod-migration-monitors-voice-learning.sql`.
+
+### 12.9 Insights `/dashboard/insights`
+
+Al reject o edit de un approval → insight + doc Knowledge tag `learning`.
 
 ---
 

@@ -115,6 +115,13 @@ EMAIL_INBOUND_SECRET=
 # Recommended: AES-256 key for mailbox passwords (64 hex chars or 32-byte base64)
 # Without it, the app derives from SUPABASE_SERVICE_ROLE_KEY (dev/fallback only).
 EMAIL_CREDENTIALS_ENCRYPTION_KEY=
+
+# WhatsApp Cloud API (optional global verify; per-connection token also works)
+WHATSAPP_VERIFY_TOKEN=
+
+# Optional
+BROWSER_WORKER_URL=
+BROWSER_WORKER_SECRET=
 ```
 
 5. Deploy
@@ -123,17 +130,31 @@ EMAIL_CREDENTIALS_ENCRYPTION_KEY=
 
 ---
 
+## 3b. WhatsApp Meta (production)
+
+1. [Meta for Developers](https://developers.facebook.com/) → App → WhatsApp → API Setup  
+2. Copy **Phone number ID** + permanent access token  
+3. Ionex → Integrations → Connect WhatsApp → paste IDs + choose default workflow  
+4. Meta → Configuration → Webhook:  
+   - Callback: `https://ionexflow.vercel.app/api/whatsapp/webhook`  
+   - Verify token: same as shown in Integrations (or `WHATSAPP_VERIFY_TOKEN`)  
+   - Subscribe to `messages`  
+5. Smoke: send a WhatsApp text to the business number → Execution appears → Approve → outbound reply (if graph has `whatsapp_send`)
+
+SQL prerequisite: `scripts/prod-migration-whatsapp-knowledge.sql`
+
+---
+
 ## 4. Smoke test (prod)
 
-1. Open `https://YOUR_DOMAIN` → Sign up
-2. Confirm org is on `trial` and dashboard works
-3. Billing → **Upgrade with Stripe Checkout** (use Stripe test card `4242…` if on test mode)
-4. After success, plan should become `active` (sync from Checkout session + webhook)
-5. Customer portal opens for the Stripe customer
-6. Confirm `Activate Pro (dev)` is **not** shown
-7. Workflow editor → **Test run** (Safe mode) → execution completes without sending real Slack/email
-8. **Save** → version appears in history → optional **Restore**
-9. If a mailbox was connected before encryption: **Integrations → reconnect** so the password is stored as `enc:v1:…`
+1. Open `https://YOUR_DOMAIN` → Sign up  
+2. Confirm org is on `trial` and dashboard works  
+3. Billing → Stripe Checkout (test card `4242…` if test mode)  
+4. **Knowledge** → add a policy doc (or starter templates) → Reindex if needed  
+5. **Workflows** → Descríbelo… or template WhatsApp support → Test run → Approve  
+6. **Integrations** → WhatsApp or email connected  
+7. Workflow **Save** → version history works  
+8. Confirm `Activate Pro (dev)` is **not** shown in production  
 
 ---
 

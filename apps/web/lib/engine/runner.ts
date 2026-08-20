@@ -387,6 +387,25 @@ async function runWhatsAppNode(options: {
         provider: "whatsapp",
       })
     );
+
+    if (result.ok) {
+      try {
+        await admin.from("whatsapp_messages").insert({
+          org_id: orgId,
+          connection_id: row.id,
+          direction: "outbound",
+          to_phone: to,
+          from_phone: null,
+          body_text: text.slice(0, 4096),
+          wa_message_id: result.id ?? null,
+          status: "sent",
+          meta: { nodeId: node.id, label: data.label },
+        });
+      } catch {
+        /* audit insert best-effort */
+      }
+    }
+
     if (!result.ok && failOnError) return { error: result.error ?? "WhatsApp failed" };
     return "ok";
   } catch (error) {

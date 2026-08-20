@@ -1,11 +1,11 @@
 # IonexFlow
 
-B2B command center for designing, running, and supervising AI agent workflows
-with human-in-the-loop approvals, automation templates, email IMAP/SMTP, and
-an in-app guide (Ionex Assistant).
+B2B command center for AI agent workflows with human approvals — email **and
+WhatsApp**, company Knowledge, NL→workflow builder, monitors, and more.
 
-> **Status:** Production — Monitors, Insights, Voice, Browser/Extract nodes, industry templates + WhatsApp/Knowledge/NL.  
-> **Ops docs:** [`docs/MANUAL-COMPLETO.md`](docs/MANUAL-COMPLETO.md) (paso a paso exhaustivo).
+> **Production:** https://ionexflow.vercel.app  
+> **Status:** WhatsApp in/out · Knowledge v2 · Descríbelo y te lo armo · Monitors · Insights · Voice · Industry templates  
+> **Docs:** [`docs/ESTADO-FUNCIONAL.md`](docs/ESTADO-FUNCIONAL.md) · [`docs/MANUAL-COMPLETO.md`](docs/MANUAL-COMPLETO.md) · [`docs/GUIA-DE-LA-APP.md`](docs/GUIA-DE-LA-APP.md) · [`docs/DEPLOY.md`](docs/DEPLOY.md)
 
 ## Stack
 
@@ -16,17 +16,33 @@ an in-app guide (Ionex Assistant).
 | Mobile | Expo Router + Supabase Auth + Realtime |
 | Database | Supabase (PostgreSQL + RLS) |
 | AI | OpenAI / Anthropic (+ demo fallback, monthly quotas) |
-| Billing | Stripe Checkout + portal (Activate Pro only in local/dev) |
+| Channels | Email IMAP/SMTP · WhatsApp Cloud API · Voice webhook · Slack/HTTP |
+| Billing | Stripe Checkout + portal |
 
-## Docs (start here)
+## What you can do today
+
+1. **Sign up** → org + owner (trial)
+2. **Descríbelo y te lo armo** — describe el proceso en español; la IA arma el diagrama (borrador inactivo) en Workflows / Automations
+3. **Canvas manual** — Agent, Classifier, Condition, Approval (+ edit), Delay, Email, WhatsApp, HTTP/Slack/Webhook, Browser, Document extract
+4. **WhatsApp** — inbound webhook → workflow; outbound `whatsapp_send` (ideal con Approval antes); plantilla *WhatsApp support*
+5. **Email** — IMAP sync + SMTP send/forward (credenciales cifradas)
+6. **Knowledge** — políticas/catálogo/PDF; chunks rankeados + historial del cliente en Agents
+7. **Approvals** — web, móvil Realtime, Slack buttons, SLA
+8. **Monitors** — umbrales proactivos → disparan un workflow
+9. **Insights** — aprende de rechazos/edits → Knowledge `learning`
+10. **Voice** — webhook transcript → mismo motor
+11. **Test run / Safe mode** + **version history**
+12. **Analytics / Audit / Team / Billing (Stripe)**
+13. **Plantillas industria** — inmobiliaria, legal, clínica, restaurante
+
+## Docs
 
 | Doc | Content |
 | --- | --- |
-| [`docs/MANUAL-COMPLETO.md`](docs/MANUAL-COMPLETO.md) | **Manual paso a paso al máximo detalle (ES)** |
-| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Ship to Vercel + Supabase Cloud + Stripe |
-| [`docs/GUIA-DE-LA-APP.md`](docs/GUIA-DE-LA-APP.md) | Product narrative (ES) |
-| [`docs/ESTADO-FUNCIONAL.md`](docs/ESTADO-FUNCIONAL.md) | Feature matrix + external config |
-| [`docs/PLAN-SIGUIENTE.md`](docs/PLAN-SIGUIENTE.md) | Roadmap |
+| [`docs/ESTADO-FUNCIONAL.md`](docs/ESTADO-FUNCIONAL.md) | Matriz de features (fuente de verdad) |
+| [`docs/MANUAL-COMPLETO.md`](docs/MANUAL-COMPLETO.md) | Manual paso a paso (ES) |
+| [`docs/GUIA-DE-LA-APP.md`](docs/GUIA-DE-LA-APP.md) | Narrativa de producto |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Vercel + Supabase + Stripe + WhatsApp Meta |
 
 ## Getting started
 
@@ -34,32 +50,17 @@ an in-app guide (Ionex Assistant).
 pnpm install
 npx supabase start
 # copy keys → apps/web/.env.local (see apps/web/.env.example)
-# optional: OPENAI_API_KEY=...
 pnpm dev:web
 ```
 
-Open http://localhost:3000 → signup → **AI Automations** → run a template → **Approvals**.
-
-## What you can do today
-
-1. Sign up (org + owner)
-2. Start from automation templates or build on the canvas
-3. Run LLM agents + classifiers + human approvals
-4. **Test run / Safe mode** (no real email/Slack/HTTP side effects)
-5. **Workflow version history** + restore on Save
-6. Connect real IMAP/SMTP email (passwords encrypted at rest)
-7. HTTP / Slack / Webhook nodes
-8. In-app notifications (+ optional Resend)
-9. Stripe Checkout (production-ready code; configure keys per DEPLOY.md)
-10. Ionex Assistant
-11. Cron tick with atomic delay/schedule claims + stuck-run reaper
+Open http://localhost:3000 → signup → **Workflows** (describe o blank) / **Integrations** (WhatsApp o email).
 
 ## Repo layout
 
 ```
 apps/web/      Command center (+ vercel.json)
 apps/mobile/   Approvals companion
-supabase/      Migrations + local config (source of truth)
+supabase/      Migrations (source of truth)
 scripts/       Cloud SQL Editor copies (`prod-migration-*.sql`)
 docs/          Product + deploy documentation
 ```

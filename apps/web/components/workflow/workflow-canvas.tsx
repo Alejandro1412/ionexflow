@@ -960,6 +960,11 @@ export function WorkflowCanvas({
                       }
                     />
                   </div>
+                  <p className="text-[11px] text-amber-200/90">
+                    Recomendado: coloca un nodo <strong>Approval</strong> antes
+                    de este envío para mensajes delicados (plantilla WhatsApp
+                    support ya lo hace).
+                  </p>
                 </>
               ) : null}
               {(selected.data as FlowNodeData).type === "browser_agent" ? (
