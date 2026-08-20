@@ -744,20 +744,48 @@ export async function runWorkflowGraph(options: {
             const {
               retrieveOrgKnowledge,
               formatKnowledgeForPrompt,
+              retrieveCustomerHistory,
             } = await import("@/lib/knowledge/retrieve");
+            const queryBlob = [
+              prompt,
+              String(triggerPayload.input ?? ""),
+              String(triggerPayload.subject ?? ""),
+              String(triggerPayload.body ?? ""),
+            ].join("\n");
             const chunks = await retrieveOrgKnowledge({
               orgId,
-              query: `${prompt}\n${String(triggerPayload.input ?? "")}`,
-              limit: 5,
+              query: queryBlob,
+              limit: 6,
+              preferKinds:
+                mode === "support" || mode === "sales"
+                  ? ["policy", "faq", "catalog", "playbook"]
+                  : undefined,
             });
             const block = formatKnowledgeForPrompt(chunks);
-            if (block) {
-              agentContext.__orgKnowledge = block;
-              systemPrompt = `${systemPrompt ?? "You are an IonexFlow business agent."}\n\nUse ONLY the following company knowledge when relevant. If it does not apply, say so briefly.\n\n${block}`;
+            const from =
+              String(
+                (triggerPayload.email as { from?: string } | undefined)?.from ??
+                  triggerPayload.from ??
+                  ""
+              ) || null;
+            const history = await retrieveCustomerHistory({
+              orgId,
+              from,
+              limit: 5,
+            });
+            const parts = [
+              block
+                ? `COMPANY KNOWLEDGE (source of truth for this business — prefer over generic knowledge):\n\n${block}`
+                : "",
+              history ? `CUSTOMER HISTORY:\n\n${history}` : "",
+            ].filter(Boolean);
+            if (parts.length) {
+              agentContext.__orgKnowledge = parts.join("\n\n");
+              systemPrompt = `${systemPrompt ?? "You are an IonexFlow business agent."}\n\nYou work for THIS company. Use the material below as ground truth. Do not invent policies, prices, or facts not present. If knowledge is insufficient, say what is missing and keep a safe reply.\n\n${parts.join("\n\n")}`;
               logs.push(
                 log(
                   node.id,
-                  `Loaded ${chunks.length} org knowledge doc(s)`,
+                  `Company brain: ${chunks.length} chunk(s)${history ? " + customer history" : ""}`,
                   "info"
                 )
               );

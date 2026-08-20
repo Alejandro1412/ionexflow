@@ -17,7 +17,7 @@ Command center B2B: diseñar y ejecutar procesos con agentes de IA + aprobacione
 | Google OAuth | OK* | Requiere claves + redirect Supabase |
 | Dashboard overview | OK | Conteos + atajos |
 | AI Automations | OK | Plantillas + **Descríbelo y te lo armo** (NL→workflow inactivo) + AI Lab |
-| Knowledge | OK | `/dashboard/knowledge` — docs de texto; agentes inyectan contexto (ILIKE MVP) |
+| Knowledge | OK | `/dashboard/knowledge` — upload/texto, tipos, chunks rankeados + historial cliente en Agents |
 | Monitors | OK | `/dashboard/monitors` — umbrales → dispara workflow vía cron |
 | Insights / learning | OK | Rechazos/edits → suggestion + Knowledge tag `learning` |
 | Voice inbound | OK | `/api/voice/webhook` + Integrations |

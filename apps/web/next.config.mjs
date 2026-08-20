@@ -6,9 +6,10 @@ const nextConfig = {
   transpilePackages: ["@ionexflow/ui"],
   experimental: {
     serverActions: {
-      bodySizeLimit: "2mb",
+      bodySizeLimit: "8mb",
     },
     optimizePackageImports: ["@supabase/supabase-js"],
+    serverComponentsExternalPackages: ["pdf-parse"],
   },
   images: {
     formats: ["image/avif", "image/webp"],

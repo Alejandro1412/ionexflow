@@ -20,6 +20,7 @@ Hardening (claim/reaper/versions): paste `scripts/prod-migration-hardening.sql`
 Business features (SLA/audit/overage): paste `scripts/prod-migration-business-features.sql`  
 WhatsApp + Knowledge: paste `scripts/prod-migration-whatsapp-knowledge.sql`  
 Monitors + Voice + Learning: paste `scripts/prod-migration-monitors-voice-learning.sql`  
+Knowledge v2 (chunks): paste `scripts/prod-migration-knowledge-v2.sql`  
 Auth Site URL must be `https://ionexflow.vercel.app`
 
 ## Architecture
